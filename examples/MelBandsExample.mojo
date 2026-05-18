@@ -10,7 +10,7 @@ struct MelBandsExample(Movable, Copyable):
     var m: Messenger
     var viz_mul: Float64
     var mix: Float64
-    var oscs: List[SinOsc[]]
+    var oscs: List[Osc[]]
     var freqs: List[Float64]
     var lags: List[Lag[]]
     var sines_vol: Float64
@@ -34,9 +34,9 @@ struct MelBandsExample(Movable, Copyable):
         for _ in range(num_bands):
             self.lags.append(Lag(self.world,512.0 / self.world[].sample_rate))
 
-        self.oscs = List[SinOsc[]]()
+        self.oscs = List[Osc[]]()
         for _ in range(num_bands):
-            self.oscs.append(SinOsc(self.world))
+            self.oscs.append(Osc(self.world))
 
         self.freqs = MelBands.mel_frequencies(num_bands,20.0,20000.0)
 

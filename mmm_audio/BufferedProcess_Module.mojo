@@ -268,3 +268,4 @@ struct BufferedProcess[T: BufferedProcessable, output: Bool = True, input_window
 
         self.read_head = (self.read_head + 1) % self.window_size
         return outval
+

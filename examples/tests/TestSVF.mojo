@@ -3,7 +3,7 @@ from mmm_audio import *
 
 struct TestSVF(Movable, Copyable):
     var world: World
-    var osc: LFSaw[]
+    var osc: LFOsc[]
     var filts: List[Biquad[]]
     var messenger: Messenger
     var freq: Float64
@@ -12,7 +12,7 @@ struct TestSVF(Movable, Copyable):
 
     def __init__(out self, world: World):
         self.world = world
-        self.osc = LFSaw(self.world)
+        self.osc = LFOsc(self.world)
         self.messenger = Messenger(self.world)
         self.filts = List[Biquad[]](capacity=2)
         self.freq = 440
@@ -23,7 +23,7 @@ struct TestSVF(Movable, Copyable):
 
     def next(mut self) -> MFloat[2]:
         self.messenger.update(self.freq,"freq")
-        sample = self.osc.next(self.freq) 
+        sample = self.osc.next[OscType.triangle](self.freq) 
         outs = MFloat[2](0.0,0.0)
         self.cutoff = linexp(self.world[].mouse_x, 0.0, 1.0, 20.0, 20000.0)
         self.messenger.update(self.res,"res")

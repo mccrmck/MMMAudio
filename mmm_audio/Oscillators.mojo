@@ -497,38 +497,39 @@ struct Osc[num_chans: Int = 1, interp: Int = Interp.linear, os_index: Int = 0](M
                 self.last_phase = phase
             return self.oversampling.get_sample()
 
-
-struct SinOsc[num_chans: Int = 1, os_index: Int = 0] (Movable, Copyable):
-    """A sine wave oscillator.
-    
-    This is a convenience struct as internally it uses [Osc](Oscillators.md/#struct-osc) and indicates `osc_type = OscType.sine`.
+struct OscBank[num: Int](Movable, Copyable):
+    """A convenience struct for processing a bank of Osc's with fixed frequencies. The number are indicated by the num parameter. Each output can be accessed via index.
 
     Parameters:
-        num_chans: Number of channels (default is 1).
-        os_index: Oversampling index (0 = no oversampling, 1 = 2x, etc.; default is 0).
-
-    Args:
-        world: Pointer to the MMMWorld instance.
+        num: The total number of Oscillators.
     """
-
-    var osc: Osc[Self.num_chans, Interp.linear, Self.os_index]  # Instance of the Oscillator
+    comptime simd_width = simd_width_of[DType.float64]() * 2
+    comptime num_simd = Self.num // Self.simd_width + (1 if Self.num % Self.simd_width != 0 else 0)
+    var oscs : List[Osc[Self.simd_width]]
+    var freqs: List[MFloat[Self.simd_width]]
 
     def __init__(out self, world: World):
-        """
+        self.oscs = [Osc[Self.simd_width](world) for _ in range(Self.num_simd)]
+        self.freqs = [MFloat[Self.simd_width](rrand(100.0, 2000.0)) for _ in range(Self.num_simd)]
 
-        Args:
-            world: Pointer to the MMMWorld instance.
-        """
-        self.osc = Osc[self.num_chans, Interp.linear, Self.os_index](world)  # Initialize the Oscillator with the world instance
+    def set_freq(mut self, index: Int, freq: Float64):
+        """Set the frequency of a specific oscillator in the bank."""
+        simd_index = index // Self.simd_width
+        lane_index = index % Self.simd_width
+        if simd_index < Self.num_simd:
+            self.freqs[simd_index][lane_index] = freq
 
-    @always_inline
-    def next(mut self: SinOsc, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: Bool = False, interp: Int = 0) -> MFloat[self.num_chans]:
-        return self.osc.next(freq, phase_offset, trig, 0)
+    def next(mut self, osc_type: MInt[1] = MInt[1](OscType.sine)) -> Float64:
+        """Process a Span (List or InlineArray) of Floats through the lags. The length of vals should be equal to num_lags."""
+        out = MFloat[Self.simd_width](0.0)
+        for i in range(Self.num_simd):
+            out += self.oscs[i].next(self.freqs[i], osc_type=osc_type)
+        return out.reduce_add() / Float64(Self.num) 
 
-struct LFSaw[num_chans: Int = 1] (Movable, Copyable):
-    """A low-frequency sawtooth oscillator.
+struct LFOsc[num_chans: Int = 1] (Movable, Copyable):
+    """A low-frequency oscillator with multiple waveform options.
     
-    This oscillator generates a non-bandlimited sawtooth waveform. It is useful for modulation, but should be avoided for audio-rate synthesis due to aliasing.
+    This oscillator generates a non-bandlimited oscillator capable of saw, triangle, and square waves. It is useful for modulation, but should be avoided for audio-rate synthesis due to aliasing.
 
     Outputs values between -1.0 and 1.0.
 
@@ -536,7 +537,8 @@ struct LFSaw[num_chans: Int = 1] (Movable, Copyable):
         num_chans: Number of channels (default is 1).
     """
 
-    var phasor: Phasor[Self.num_chans]  # Instance of the Oscillator
+    var phasor: Phasor[Self.num_chans]
+    var world: World 
 
     def __init__(out self, world: World):
         """
@@ -544,10 +546,11 @@ struct LFSaw[num_chans: Int = 1] (Movable, Copyable):
         Args:
             world: Pointer to the MMMWorld instance.
         """
-        self.phasor = Phasor[self.num_chans](world)  # Initialize the Phasor with the world instance
+        self.phasor = Phasor[self.num_chans](world)
+        self.world = world
 
     @always_inline
-    def next(mut self: LFSaw, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: Bool = False) -> MFloat[self.num_chans]:
+    def next[osc_type: MInt[1]](mut self, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: Bool = False) -> MFloat[self.num_chans]:
         """Generate the next sawtooth wave sample.
         
         Args:
@@ -558,71 +561,15 @@ struct LFSaw[num_chans: Int = 1] (Movable, Copyable):
         """
 
         var trig_mask = MBool[self.num_chans](fill=trig)
-        return 1.0 - 2.0 * self.phasor.next(freq, phase_offset, trig_mask)
-
-struct LFSquare[num_chans: Int = 1] (Movable, Copyable):
-    """A low-frequency square wave oscillator.
-    
-    Creates a non-band-limited square wave. Outputs values of -1.0 or 1.0. Useful for modulation, but should be avoided for audio-rate synthesis due to aliasing.
-
-    Parameters:
-        num_chans: Number of channels (default is 1).
-    """
-
-    var phasor: Phasor[Self.num_chans]  # Instance of the Oscillator
-
-    def __init__(out self, world: World):
-        """
-
-        Args:
-            world: Pointer to the MMMWorld instance.
-        """
-        self.phasor = Phasor[self.num_chans](world)  # Initialize the Phasor with the world instance
-
-    @always_inline
-    def next(mut self: LFSquare, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: Bool = False) -> MFloat[self.num_chans]:
-        """Generate the next square wave sample.
-
-        Args:
-            freq: Frequency of the square wave in Hz.
-            phase_offset: Offsets the phase of the oscillator (default is 0.0).
-            trig: Trigger signal to reset the phase when switching from False to True (default is 0.0).
-        """
-        var trig_mask = MBool[self.num_chans](fill=trig)
-        return -1.0 if self.phasor.next(freq, phase_offset, trig_mask) < 0.5 else 1.0
-
-struct LFTri[num_chans: Int = 1] (Movable, Copyable):
-    """A low-frequency triangle wave oscillator.
-    
-    This oscillator generates a triangle wave at audio rate. It is useful for 
-    modulation, but should be avoided for audio-rate synthesis due to aliasing.
-
-    Parameters:
-        num_chans: Number of channels (default is 1).
-    """
-
-    var phasor: Phasor[Self.num_chans]  # Instance of the Oscillator
-
-    def __init__(out self, world: World):
-        """
-
-        Args:
-            world: Pointer to the MMMWorld instance.
-        """
-        self.phasor = Phasor[self.num_chans](world)  # Initialize the Phasor with the world instance
-
-    @always_inline
-    def next(mut self: LFTri, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: Bool = False) -> MFloat[self.num_chans]:
-        """Generate the next triangle wave sample.
-
-        Args:
-            freq: Frequency of the triangle wave in Hz.
-            phase_offset: Offsets the phase of the oscillator.
-            trig: Trigger signal to reset the phase when switching from False to True.
-        """
-
-        var trig_mask = MBool[self.num_chans](fill=trig)
-        return (abs((self.phasor.next(freq, phase_offset-0.25, trig_mask) * 4.0) - 2.0) - 1.0)
+        comptime if osc_type == OscType.saw:
+            return 1.0 - 2.0 * self.phasor.next(freq, phase_offset, trig_mask)
+        elif osc_type == OscType.triangle:
+            return (abs((self.phasor.next(freq, phase_offset, trig_mask) * 4.0) - 2.0) - 1.0)
+        elif osc_type == OscType.square:
+            return -1.0 if self.phasor.next(freq, phase_offset, trig_mask) < 0.5 else 1.0
+        else:
+            phase = self.phasor.next(freq, phase_offset, trig_mask)
+            return sin(phase * two_pi)
 
 struct Dust[num_chans: Int = 1] (Movable, Copyable):
     """A dust noise oscillator that generates random impulses at random intervals.

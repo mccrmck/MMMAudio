@@ -13,10 +13,6 @@ struct FFTProcessor[T: FFTProcessable, ifft: Bool = True](BufferedProcessable):
     var window_size: Int
     var fft: RealFFT[1]
     var fft2: RealFFT[2]
-    var mags: List[Float64]
-    var phases: List[Float64]
-    var st_mags: List[SIMD[DType.float64,2]]
-    var st_phases: List[SIMD[DType.float64,2]]
 
     @doc_hidden
     def __init__(out self, world: World, var process: Self.T, window_size: Int):
@@ -25,10 +21,6 @@ struct FFTProcessor[T: FFTProcessable, ifft: Bool = True](BufferedProcessable):
         self.window_size = window_size
         self.fft = RealFFT[1](self.window_size)
         self.fft2 = RealFFT[2](self.window_size)
-        self.mags = List[Float64](length=(self.window_size // 2) + 1, fill=0.0)
-        self.phases = List[Float64](length=(self.window_size // 2) + 1, fill=0.0)
-        self.st_mags = List[SIMD[DType.float64,2]](length=(self.window_size // 2 + 1 + 1) // 2, fill=SIMD[DType.float64,2](0.0))
-        self.st_phases = List[SIMD[DType.float64,2]](length=(self.window_size // 2 + 1 + 1) // 2, fill=SIMD[DType.float64,2](0.0))
 
     def next_window(mut self, mut input: List[Float64]) -> None:
         self.fft.fft(input)

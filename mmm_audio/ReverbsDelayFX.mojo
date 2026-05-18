@@ -248,7 +248,7 @@ struct Phaser[num_chans: Int = 1, stages: Int = 8](Movable, Copyable):
     """
     var world: World
     var all_passes: List[SVF[Self.num_chans]]
-    var lfo: LFTri[]
+    var lfo: LFOsc[]
 
     def __init__(out self, world: World):
         """Initialize the phaser effect.
@@ -258,7 +258,7 @@ struct Phaser[num_chans: Int = 1, stages: Int = 8](Movable, Copyable):
         """
         self.world = world
         self.all_passes = [SVF[Self.num_chans](self.world) for _ in range (Self.stages)]
-        self.lfo = LFTri[](world)
+        self.lfo = LFOsc[](world)
 
     def next(mut self, input: MFloat[Self.num_chans], center_freq: MFloat[1] = 1000., Q: MFloat[1] = 0.7, lfo_freq: MFloat[1] = 0.7, lfo_octaves: MFloat[1] = 1., freq_offset: MFloat[1] = 0., mix: MFloat[1] = 0.5) -> MFloat[Self.num_chans]:
         """Process the input audio through the phaser effect.
@@ -274,7 +274,7 @@ struct Phaser[num_chans: Int = 1, stages: Int = 8](Movable, Copyable):
         """
 
         allpass_out = input
-        lfo = self.lfo.next(lfo_freq)
+        lfo = self.lfo.next[OscType.triangle](lfo_freq)
         center_freq_real = abs(center_freq)
         center_freq_real = center_freq_real + linexp(lfo, -1., 1., center_freq_real/(2**lfo_octaves), center_freq_real*(2**lfo_octaves))
         for i in range(Self.stages):
@@ -294,12 +294,12 @@ struct Flanger[num_chans: Int = 1, interp: Int = Interp.lagrange4](Movable, Copy
     """
     var world: World
     var comb: Comb[Self.num_chans, Self.interp]
-    var lfo: LFTri[]
+    var lfo: LFOsc[]
 
     def __init__(out self, world: World):
         self.world = world
         self.comb = Comb[Self.num_chans, Self.interp](self.world, max_delay_time=0.05)
-        self.lfo = LFTri[](world)
+        self.lfo = LFOsc[](world)
 
     def next(mut self, input: MFloat[Self.num_chans], center_freq: MFloat[1], feedback_coef: MFloat[1], lfo_freq: MFloat[1], lfo_octaves: MFloat[1], mix: MFloat[1]) -> MFloat[Self.num_chans]:
         """Process the input audio through the flanger effect.
@@ -312,7 +312,7 @@ struct Flanger[num_chans: Int = 1, interp: Int = Interp.lagrange4](Movable, Copy
             lfo_octaves: The number of octaves above and below the base center frequency that the LFO will modulate. For example, if center_freq is 1000 Hz and lfo_octaves is 1, then the LFO will modulate between 500 Hz and 2000 Hz.
             mix: The wet/dry mix of the effect. A value of 0 means only the original signal (dry), while a value of 1 means only the processed signal (wet). Values in between blend the two signals together.
         """
-        lfo = self.lfo.next(lfo_freq)
+        lfo = self.lfo.next[OscType.triangle](lfo_freq)
         center_freq_real = abs(center_freq)
         center_freq_real = center_freq_real + linexp(lfo, -1., 1., center_freq_real/(2**lfo_octaves), center_freq_real*(2**lfo_octaves))
         center_freq_real = clip(center_freq_real, 20., 20000.)

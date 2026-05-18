@@ -2,7 +2,7 @@ from mmm_audio import *
 
 struct OscVoice(Movable, Copyable):
     var osc: Osc[1,Interp.quad,1]
-    var tri: LFTri[]
+    var tri: LFOsc[]
     var world: World
     var env: ASREnv
     var gate: Bool
@@ -12,7 +12,7 @@ struct OscVoice(Movable, Copyable):
 
     def __init__(out self, world: World, name_space: String = ""):
         self.osc = Osc[1,Interp.quad,1](world)
-        self.tri = LFTri(world)
+        self.tri = LFOsc(world)
         self.env = ASREnv(world)
         self.gate = False
         self.freq = 440.0
@@ -24,7 +24,7 @@ struct OscVoice(Movable, Copyable):
         self.messenger.update(self.gate, "gate")
         self.messenger.update(self.freq, "freq")
         self.messenger.update(self.wubb_rate, "wubb_rate")
-        osc_frac = self.tri.next(self.wubb_rate, 0.75, trig=self.gate) * 0.5 + 0.5
+        osc_frac = self.tri.next[OscType.triangle](self.wubb_rate, 0.75, trig=self.gate) * 0.5 + 0.5
         return self.osc.next_vwt(buffer, self.freq, osc_frac = osc_frac) * self.env.next(0.01,0.2,0.1,self.gate,2)
 
 struct WavetableOsc(Movable, Copyable):

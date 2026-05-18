@@ -2,7 +2,7 @@ from mmm_audio import *
 
 struct OscVoice(PolyObject):
     var osc: Osc[1,Interp.sinc,0]
-    var tri: LFTri[]
+    var tri: LFOsc[]
     var world: World
     var env: ASREnv
     var gate: Bool
@@ -25,7 +25,7 @@ struct OscVoice(PolyObject):
 
     def __init__(out self, world: World, name_space: String = ""):
         self.osc = Osc[1,Interp.sinc,0](world)
-        self.tri = LFTri(world)
+        self.tri = LFOsc(world)
         self.env = ASREnv(world)
         self.gate = False
         self.freq = 440.0
@@ -36,7 +36,7 @@ struct OscVoice(PolyObject):
         self.triggered = False
 
     def next(mut self, ref buffer: SIMDBuffer) -> MFloat[1]:
-        osc_frac = self.tri.next(self.wubb_rate, 0.75, trig=self.gate) * 0.5 + 0.5
+        osc_frac = self.tri.next[OscType.triangle](self.wubb_rate, 0.75, trig=self.gate) * 0.5 + 0.5
         return self.osc.next_vwt(buffer, self.freq, osc_frac = osc_frac) * self.env.next(0.01,0.2,0.7,self.gate,2) * self.vol
 
 struct WavetableOscSIMDStrings(Movable, Copyable):

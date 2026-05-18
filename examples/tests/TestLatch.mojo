@@ -5,16 +5,16 @@ from mmm_audio import *
 # a graph can have as many synths as you want
 struct TestLatch(Movable, Copyable):
     var world: World
-    var osc: SinOsc[]
-    var lfo: SinOsc[]
+    var osc: Osc[]
+    var lfo: Osc[]
     var latch: Latch[] 
     var dusty: Dust[]
     var messenger: Messenger
 
     def __init__(out self, world: World):
         self.world = world
-        self.osc = SinOsc(self.world)
-        self.lfo = SinOsc(self.world)
+        self.osc = Osc(self.world)
+        self.lfo = Osc(self.world)
         self.latch = Latch()
         self.dusty = Dust(self.world)
         self.messenger = Messenger(self.world)
