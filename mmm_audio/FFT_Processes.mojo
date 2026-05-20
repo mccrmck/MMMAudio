@@ -76,12 +76,12 @@ struct SpectralFreezeWindow[window_size: Int](FFTProcessable):
             self.mono_mags[i] = (mags[i][0] + mags[i][1])
 
         if not self.frozen:
-            for i in range(Self.window_size//2):
+            for i in range(Self.window_size//2 + 1):
                 self.diff_phases[i] = phases[i]-self.prev_phases[i]
                 self.prev_phases[i] = phases[i]
                 self.stored_mags[i] = mags[i]
         else:
-            for i in range(Self.window_size//2):
+            for i in range(Self.window_size//2 + 1):
                 self.prev_phases[i] = self.prev_phases[i] + self.diff_phases[i]
                 phases[i] = self.prev_phases[i]
                 

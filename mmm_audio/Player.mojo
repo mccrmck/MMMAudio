@@ -225,7 +225,7 @@ struct Grain(PolyObject):
 
     @always_inline
     def next_pan2[num_playback_chans: Int = 1, win_type: Int = 0, bWrap: Bool = False](mut self, 
-    mut buffer: SIMDBuffer,
+    buffer: SIMDBuffer,
     rate: Float64 = 1.0, 
     loop: Bool = False, 
     start_frame: Int = 0, 
@@ -263,7 +263,7 @@ struct Grain(PolyObject):
 
     @always_inline
     def next_pan_az[num_simd_chans: Int = 4, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
-    mut buffer: SIMDBuffer, 
+    buffer: SIMDBuffer, 
     rate: Float64 = 1.0, 
     loop: Bool = False, 
     start_frame: Int = 0, 
@@ -298,7 +298,7 @@ struct Grain(PolyObject):
         return panned
 
     def next[num_chans: Int = 1, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
-    mut buffer: SIMDBuffer[num_chans], 
+    buffer: SIMDBuffer[num_chans], 
     rate: Float64 = 1.0, 
     loop: Bool = False, 
     start_frame: Int = 0, 
@@ -399,7 +399,7 @@ struct TGrains(Movable, Copyable):
 
     @always_inline
     def next[num_playback_chans: Int = 1, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
-    mut buffer: SIMDBuffer,
+    buffer: SIMDBuffer,
     rate: Float64 = 1.0, 
     trig: Bool = False, 
     start_frame: Int = 0, 
@@ -407,17 +407,17 @@ struct TGrains(Movable, Copyable):
     pan: Float64 = 0.0, 
     gain: Float64 = 1.0,
     buf_chan: Int = 0) -> MFloat[2]:
-        """Generate the next set of grains. Uses pan2 to pan to 2 channels. Depending on num_playback_chans, will either pan a mono signal out 2 channels or a stereo signal out 2 channels.
+        """Generate the next set of grains. Depending on num_playback_chans, will either pan a mono signal out 2 channels or a stereo signal out 2 channels.
         
         Parameters:
             num_playback_chans: Either 1 or 2, depending on whether you want to pan 1 channel of a buffer out 2 channels or 2 channels of the buffer with equal power panning.
             win_type: Type of window to apply to each grain (default is Hann window (WinType.hann)). For a user-defined envelope, set win_type to WindowType.user_defined and use the set_env_params function to assign EnvParams to all grains.
             bWrap: Whether to interpolate between the end and start of the buffer when reading (default: False). When False, reading beyond the end of the buffer will return 0. When True, the index into the buffer will wrap around to the beginning using a modulus.
 
-        Args:.
+        Args:
             buffer: Audio buffer containing the source sound.
             rate: Playback rate of the grains (1.0 = normal speed).
-            trig: Trigger signal (>0 to start a new grain).
+            trig: Boolean trigger signal which starts a new grain.
             start_frame: Starting frame position in the buffer.
             duration: Duration of each grain in seconds.
             pan: Panning position from -1.0 (left) to 1.0 (right).
@@ -425,7 +425,7 @@ struct TGrains(Movable, Copyable):
             buf_chan: The first buffer channel to read from for the grain (default: 0).
 
         Returns:
-            List of output samples for all channels.
+            Output samples for left and right channels as a SIMD vector.
         """
         self._trig_grain[win_type](trig)
 
@@ -438,7 +438,7 @@ struct TGrains(Movable, Copyable):
 
     @always_inline
     def next_pan_az[num_simd_chans: Int = 2, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
-    mut buffer: SIMDBuffer, 
+    buffer: SIMDBuffer, 
     rate: Float64 = 1.0, 
     trig: Bool = False, 
     start_frame: Int = 0, 
@@ -457,7 +457,7 @@ struct TGrains(Movable, Copyable):
         Args:
             buffer: Audio buffer containing the source sound.
             rate: Playback rate of the grains (1.0 = normal speed).
-            trig: Trigger signal (>0 to start a new grain).
+            trig: Boolean trigger signal which starts a new grain.
             start_frame: Starting frame position in the buffer.
             duration: Duration of each grain in seconds.
             pan: Panning position from -1.0 (left) to 1.0 (right).
@@ -480,7 +480,7 @@ struct TGrains(Movable, Copyable):
 
     @always_inline
     def next_all_chans[num_chans: Int, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
-    mut buffer: SIMDBuffer[num_chans], 
+    buffer: SIMDBuffer[num_chans], 
     rate: Float64 = 1.0, 
     trig: Bool = False, 
     start_frame: Int = 0, 
@@ -496,7 +496,7 @@ struct TGrains(Movable, Copyable):
         Args:
             buffer: Audio buffer containing the source sound.
             rate: Playback rate of the grains (1.0 = normal speed).
-            trig: Trigger signal (>0 to start a new grain).
+            trig: Boolean trigger signal which starts a new grain.
             start_frame: Starting frame position in the buffer.
             duration: Duration of each grain in seconds.
             gain: Amplitude scaling factor for the grains.
