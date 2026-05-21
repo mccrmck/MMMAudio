@@ -62,11 +62,11 @@ struct SubtractiveTemplate(Movable, Copyable):
         self.res = MFloat[1](0.5)
         
     def next(mut self) -> MFloat[2]:
-        self.m.update(self.freq, "freq")
-        self.m.update(self.ffreq, "ffreq")
-        self.m.update(self.res, "res")
-        self.m.update(self.lfo_freq, "lfo_freq")
-        # self.m.update(self.fold_amt, "fold_amt")
+        self.m.update("freq", self.freq)
+        self.m.update("ffreq", self.ffreq)
+        self.m.update("res", self.res)
+        self.m.update("lfo_freq", self.lfo_freq)
+        # self.m.update("fold_amt", self.fold_amt)
 
         sig = self.saw.next(self.freq,osc_type=OscType.saw)
         # sig = self.wavefolder.next(sig, self.fold_amt)

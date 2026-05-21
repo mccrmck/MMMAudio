@@ -133,16 +133,16 @@ struct Env(Movable, Copyable):
 
         env = self._apply_phase(phase)
         comptime if win_type != WindowType.none:
-            env *= win_env[win_type, Interp.linear](self.world, env*0.5)
+            env *= win_env[win_type, interp](self.world, env*0.5)
         
         return env
 
-    def next[win_type: Int = WindowType.none, interp: Int = Interp.none](mut self, trig: Bool, phase: MFloat[1]) -> MFloat[1]:
+    def next[win_type: Int = WindowType.none, interp: Int = Interp.linear](mut self, trig: Bool, phase: MFloat[1]) -> MFloat[1]:
         """Generate the next envelope value with a provided phase rather than using the internal phasor. Works well with a Line UGen. Uses the internal `params` struct for envelope parameters. See `EnvParams` for more details on the parameters.
             
         Parameters:
             win_type: Used to apply a window type to the envelope curves. Default is WindowType.none, which means linear ramps. See `WindowType` struct for available window types.
-            interp: Interpolation type to apply to the window. Default is Interp.none, which means no interpolation. See `Interp` struct for available interpolation types.
+            interp: Interpolation type to apply to the window. Default is Interp.linear, which means linear interpolation. See `Interp` struct for available interpolation types.
 
         Args:
             trig: Trigger to start the envelope.
@@ -159,7 +159,7 @@ struct Env(Movable, Copyable):
         env = self._apply_phase(phase)
 
         comptime if win_type != WindowType.none:
-            env *= win_env[win_type, Interp.linear](self.world, env*0.5)
+            env *= win_env[win_type, interp](self.world, env*0.5)
         
         return env
 
@@ -177,10 +177,41 @@ struct Env(Movable, Copyable):
     def get_phase(self) -> Float64:
         """Get the current phase of the envelope (between 0 and 1)."""
         return clip(self.sweep.phase, 0.0, 1.0)
-    
+
+    @staticmethod
+    def get_env_buffer[num_chans: Int = 1, win_type: Int = WindowType.none, interp: Int = Interp.linear](world: World, *env_defs: EnvParams, size: Int = 1024) -> SIMDBuffer[num_chans]:
+        """Get a SIMDBuffer of envelope values.
+
+        Args:
+            world: Pointer to the MMMWorld.
+            env_defs: One or more EnvParams structs defining the envelope parameters to generate the table from.
+            size: Size of the output table. Default is 1024.
+
+        Returns:
+            A SIMDBuffer containing `num_chans` of envelope values.
+        """
+        env = Env(world)
+        buffer = SIMDBuffer[num_chans].zeros(size)
+        for i in range(min(env_defs.__len__(), num_chans)):
+            env.params = env_defs[i].copy()
+            
+            for j in range(size):
+                phase = Float64(j) / Float64(size - 1)
+                buffer.data[j][i] = env.next[win_type, interp](False, phase)  # Get envelope value at the specified phase without triggering
+        return buffer^
+
 def win_env[window_type: Int = WindowType.sine, interp: Int = Interp.none](world: World, win_phase: MFloat[1]) -> MFloat[1]:
     temp = world[].windows.value()
     val = temp[].at_phase[window_type, interp](world, win_phase)
+    return val
+
+def buf_env[num_chans: Int = 1, interp: Int = Interp.linear, bWrap: Bool = True](world: World, env_buffer: SIMDBuffer[num_chans], phase: MFloat[1]) -> MFloat[num_chans]:
+    val = SpanInterpolator.read[interp=interp,bWrap=bWrap](
+        world=world,
+        data=env_buffer.data,
+        f_idx=phase * Float64(len(env_buffer.data) - 1),
+        prev_f_idx=0.0
+    )
     return val
 
 # min_env is just a function, not a struct
