@@ -10,6 +10,8 @@
 !doc_generation/**
 !examples/
 !examples/**
+!workshop_templates/
+!workshop_templates/**
 
 !mmm_audio/
 !mmm_audio/**
