@@ -75,8 +75,7 @@ nav:
       - Sinc Interpolation: api/SincInterpolator.md
     - Core Framework:
       - World: api/MMMWorld.md
-      - Python Class: api/MMMAudio.md
-      - Python Mojo Interop: api/MMMAudioBridge.md
+      - Python MMMAudio Class: api/MMMAudio.md
       - Messenger: api/Messenger.md
       - Patterns: api/Patterns.md
       - Scheduler: api/Scheduler.md

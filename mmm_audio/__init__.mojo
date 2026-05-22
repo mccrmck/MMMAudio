@@ -31,7 +31,6 @@ from .functions import *
 from .FFT_Processes import *
 from .FFT_Functions import *
 from .ComplexFFTProcess_Module import *
-from .windows_waveforms import *
 from .Polyphony import *
 from .Patterns import *
 

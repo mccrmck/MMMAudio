@@ -39,7 +39,7 @@ def PyInit_GrainsBridge() -> PythonObject:
         _ = Error(String("error creating Python Mojo module: " + String(e)))
         abort()
 
-
+@doc_hidden
 @fieldwise_init
 struct MMMAudioBridge(Movable, Writable):
     var world: World
