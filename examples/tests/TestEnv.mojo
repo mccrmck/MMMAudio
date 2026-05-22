@@ -40,7 +40,7 @@ struct TestEnv(Movable, Copyable):
         
         env6 = buf_env(self.world, self.env_buffer, line)
 
-        return MFloat[8](env6, env1, env3, env4, env5, 0., 0., 0.) * 0.9
+        return MFloat[8](env1, env2, env3, env4, env5, env6, 0., 0.) * 0.9
 
 
 
