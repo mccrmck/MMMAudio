@@ -8,17 +8,9 @@ from mmm_audio import *
 struct EnvParams(Movable, Copyable):
     """Parameters for the Env class.
 
-    This struct holds the parameters for the envelope generator. It
-    is not required to use the `Env` struct, but it might be convenient.
-
-
-    Elements:
-    
-    values: List of envelope values at each breakpoint.  
-    times: List of durations (in seconds) for each segment between adjacent breakpoints. This List should be one element shorter than the `values` List.  
-    curves: List of curve shapes for each segment. Positive values for convex "exponential" curves, negative for concave "logarithmic" curves. (if the output of the envelope is negative, the curve will be inverted).  
-    loop: Bool to indicate if the envelope should loop.  
-    time_warp: Time warp factor to speed up or slow down the envelope. Default is 1.0 meaning no warp. A value of 2.0 will make the envelop take twice as long to complete. A value of 0.5 will make the envelope take half as long to complete.
+    This struct defines the parameters of an envelope. An instance of
+    this struct is used internally in the `Env` struct. It is also used
+    in other places in the library when appropriate.
     """
 
     var values: List[Float64]
@@ -30,7 +22,12 @@ struct EnvParams(Movable, Copyable):
     def __init__(out self, values: List[Float64] = [0,1,0], times: List[Float64] = [1,1], curves: List[Float64] = [1], loop: Bool = False, time_warp: Float64 = 1.0):
         """Initialize EnvParams.
 
-        For information on the arguments, see the documentation of the `Env::next()` method that takes each parameter individually.
+        Args:
+            values: List of envelope values at each breakpoint.
+            times: List of durations (in seconds) for each segment between adjacent breakpoints. This List should be one element shorter than the `values` List.
+            curves: List of curve shapes for each segment. Positive values for convex "exponential" curves, negative for concave "logarithmic" curves. (if the output of the envelope is negative, the curve will be inverted).
+            loop: Bool to indicate if the envelope should loop.
+            time_warp: Time warp factor to speed up or slow down the envelope. Default is 1.0 meaning no warp. A value of 2.0 will make the envelop take twice as long to complete. A value of 0.5 will make the envelope take half as long to complete.
         """
         
         self.values = values.copy()  # Make a copy to avoid external modifications
@@ -92,7 +89,7 @@ struct Env(Movable, Copyable):
             self.freq = 0.0
 
     def next[win_type: Int = WindowType.none, interp: Int = Interp.none](mut self, trig: Bool = True) -> Float64:
-         """Generate the next envelope value. Uses the internal `params` struct for envelope parameters. See `EnvParams` for more details on the parameters. Also uses an internal phasor to track the progression of the envelope, which is reset on each trigger.
+         """Generate the next envelope value. Uses the internal `params` struct for envelope parameters. See `EnvParams` for more details on the parameters. Uses an internal phasor to track the progression of the envelope, which is reset on each trigger.
 
         Parameters:
             win_type: Used to apply a window type to the envelope curves. Default is WindowType.none, which means linear ramps. See `WindowType` struct for available window types.
@@ -140,10 +137,10 @@ struct Env(Movable, Copyable):
 
     def next[win_type: Int = WindowType.none, interp: Int = Interp.linear](mut self, trig: Bool, phase: MFloat[1]) -> MFloat[1]:
         """Generate the next envelope value with a provided phase rather than using the internal phasor. Works well with a Line UGen. Uses the internal `params` struct for envelope parameters. See `EnvParams` for more details on the parameters.
-            
+
         Parameters:
             win_type: Used to apply a window type to the envelope curves. Default is WindowType.none, which means linear ramps. See `WindowType` struct for available window types.
-            interp: Interpolation type to apply to the window. Default is Interp.linear, which means linear interpolation. See `Interp` struct for available interpolation types.
+            interp: Interpolation type to apply to the window. Default is Interp.linear. See `Interp` struct for available interpolation types.
 
         Args:
             trig: Trigger to start the envelope.
@@ -253,7 +250,7 @@ def buf_env[num_chans: Int, interp: Int = Interp.linear, bWrap: Bool = True](wor
 def min_env[win_type: Int = WindowType.none, interp: Int = Interp.none](world: World, phase: MFloat[1] = 0.0, ramp_amount: MFloat[1] = 0.01) -> MFloat[1]:
     """Simple envelope.
 
-    Envelope that creates a simple trapezoidal envelope with linear ramps. The attack and release ramps are determined by the `ramp_amount` parameter, which specifies the duration of the ramps as a proportion of the total envelope duration. Values between 0 and 0.5.
+    Envelope that creates a simple trapezoidal envelope with linear ramps. The attack and release ramps are determined by the `ramp_amount` parameter.
 
     Parameters:
         win_type: Used to apply a window type to the envelope curves. Default is WindowType.none, which means linear ramps. See `WindowType` struct for available window types.
@@ -309,7 +306,7 @@ struct ASREnv(Movable, Copyable):
         
         Parameters:
             win_type: Used to apply a window type to the envelope curves. Default is WindowType.none, which means linear ramps. See `WindowType` struct for available window types.
-            interp: Interpolation type to apply to the window. Default is Interp.none, which means no interpolation. See `Interp` struct for available interpolation types.
+            interp: Interpolation type to apply to the window. Default is Interp.none. See `Interp` struct for available interpolation types.
 
         Args:
             attack: (Float64): Attack time in seconds.

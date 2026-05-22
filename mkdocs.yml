@@ -57,8 +57,9 @@ nav:
       - Delays: api/Delays.md
       - Distortion: api/Distortion.md
       - Env: api/Envelopes.md
-      - FFT: api/FFTs.md
+      - Real FFT: api/FFTs.md
       - FFTProcess: api/FFTProcess.md
+      - ComplexFFTProcess: api/ComplexFFTProcess.md
       - FFT Processes: api/FFT_Processes.md
       - Filters: api/Filters.md
       - MLP Mojo: api/MLP.md
@@ -71,6 +72,7 @@ nav:
       - Polyphony: api/Polyphony.md
       - Recorder: api/Recorder.md
       - Reverbs & Delay FX: api/ReverbsDelayFX.md
+      - Sound File I/O: api/sound_file.md
       - Utilities: api/functions.md
       - Sinc Interpolation: api/SincInterpolator.md
     - Core Framework:
