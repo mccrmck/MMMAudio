@@ -186,20 +186,24 @@ struct Grain(PolyObject):
     """
     var world: World  # Pointer to the MMMWorld instance
 
-    var start_frame: Int
-    var num_frames: Int  
+    var start_frame: Float64
+    var num_frames: Float64  
     var rate: Float64  
     var pan: Float64  
     var gain: Float64 
     var rising_bool_detector: RisingBoolDetector[1]
     var play_buf: Play
+    var line: Line[]
+    var dur: Float64
     var trigger: Bool
     var user_defined_env: Env
     var env_trigger: Bool
 
     # These are the functions that need to be implemented for the PolyObject trait:
     def check_active(mut self) -> Bool:
-        return self.play_buf.active
+        # return self.play_buf.active
+        # print(self.line.phase < 1.0)
+        return self.line.phase < 1.0
 
     def set_trigger(mut self, trigger: Bool):
         self.trigger = trigger
@@ -213,12 +217,15 @@ struct Grain(PolyObject):
         """
         self.world = world  
         self.start_frame = 0
-        self.num_frames = 0
+        self.num_frames = 0.0
         self.rate = 1.0
         self.pan = 0.5 
         self.gain = 1.0
         self.rising_bool_detector = RisingBoolDetector() 
         self.play_buf = Play(world)
+        self.line = Line[](world)
+        self.line.phase = 1.0
+        self.dur = 1.0
         self.trigger = False
         self.user_defined_env = Env(world)
         self.env_trigger = False
@@ -322,27 +329,23 @@ struct Grain(PolyObject):
             gain: Amplitude scaling factor for the grain.
         """
         trig2 = False
-        if self.rising_bool_detector.next(self.trigger):
-            self.start_frame = start_frame
-            self.num_frames =  Int(duration * buffer.sample_rate*rate)  # Calculate end frame based on duration
-            self.rate = rate
+        if self.trigger:
+            self.start_frame = Float64(start_frame)
+            self.num_frames = duration * buffer.sample_rate * rate  # Calculate end frame based on duration
+            self.dur = duration
             self.gain = gain
             self.pan = pan
             trig2 = True
-        
-        # Get samples from Play with a new trigger
-        sample = self.play_buf.next[interp=Interp.linear, bWrap=bWrap](buffer, self.rate, loop, trig2, self.start_frame, self.num_frames) 
 
-        # Get the current phase of the PlayBuf
-        if self.play_buf.reset_phase_point > 0.0:
-            win_phase = self.play_buf.impulse.phase / self.play_buf.reset_phase_point  
-        else:
-            win_phase = 0.0  # Use the phase
+        phase = self.line.next(0.0, 1.0, self.dur, trig2)
+        buf_phase = (phase * self.num_frames + self.start_frame) / Float64(buffer.num_frames)
+        sample = buf_read[interp=Interp.linear, bWrap=bWrap](self.world, buffer, buf_phase)
 
         comptime if win_type == WindowType.user_defined:
-            win = self.user_defined_env.next(trig2, win_phase)
+            win = self.user_defined_env.next(trig2, phase)
         else:
-            win = win_env[win_type, Interp.linear](self.world, win_phase)
+            win = win_read[win_type, Interp.linear](self.world, phase)
+
         # this only works with 1 or 2 channels, if you try to do more, it will just return 2 channels
         sample = sample * win * self.gain  # Apply the window to the sample
         
@@ -391,6 +394,7 @@ struct TGrains(Movable, Copyable):
         comptime if win_type == WindowType.user_defined:            
             grain_num = self.poly.next(self.grains, trig)
             if grain_num >= 0:
+                # print("Triggering grain number: ", grain_num)
                 if self.grains[grain_num].env_trigger and trig:
                     self.grains[grain_num].user_defined_env.params = self.env_params.copy()
                     self.grains[grain_num].env_trigger = False

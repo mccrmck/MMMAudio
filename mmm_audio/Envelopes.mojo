@@ -131,7 +131,7 @@ struct Env(Movable, Copyable):
 
         env = self._apply_phase(phase)
         comptime if win_type != WindowType.none:
-            env *= win_env[win_type, interp](self.world, env*0.5)
+            env *= win_read[win_type, interp](self.world, env*0.5)
         
         return env
 
@@ -157,7 +157,7 @@ struct Env(Movable, Copyable):
         env = self._apply_phase(phase)
 
         comptime if win_type != WindowType.none:
-            env *= win_env[win_type, interp](self.world, env*0.5)
+            env *= win_read[win_type, interp](self.world, env*0.5)
         
         return env
 
@@ -200,8 +200,8 @@ struct Env(Movable, Copyable):
                 buffer.data[j][i] = env.next[win_type, interp](True, phase)
         return buffer^
 
-def win_env[window_type: Int = WindowType.sine, interp: Int = Interp.none](world: World, phase: MFloat[1]) -> MFloat[1]:
-    """Phase lookup into a window function stored in MMMWorld's windows variable.
+def win_read[window_type: Int = WindowType.sine, interp: Int = Interp.none](world: World, phase: MFloat[1]) -> MFloat[1]:
+    """Reads a window function from MMMWorld's default Window by indexing into it with the provided phase.
 
     Parameters:
         window_type: The type of window to look up. See `WindowType` struct for available window types.
@@ -218,8 +218,8 @@ def win_env[window_type: Int = WindowType.sine, interp: Int = Interp.none](world
     val = temp[].at_phase[window_type, interp](world, phase)
     return val
 
-def buf_env[num_chans: Int, interp: Int = Interp.linear, bWrap: Bool = True](world: World, env_buffer: SIMDBuffer[num_chans], phase: MFloat[1], prev_phase: MFloat[1] = 0.0) -> MFloat[num_chans]:
-    """Reads a buffer by indexing with the provided phase.
+def buf_read[num_chans: Int, interp: Int = Interp.linear, bWrap: Bool = True](world: World, env_buffer: SIMDBuffer[num_chans], phase: MFloat[1], prev_phase: MFloat[1] = 0.0) -> MFloat[num_chans]:
+    """Reads a buffer by indexing into it with the provided phase.
 
     Args:
         world: Pointer to the MMMWorld.
@@ -273,7 +273,7 @@ def min_env[win_type: Int = WindowType.none, interp: Int = Interp.none](world: W
         env = 1.0
 
     comptime if win_type != WindowType.none:
-        env *= win_env[win_type, interp](world, env/2.)
+        env *= win_read[win_type, interp](world, env/2.)
 
     return env
 
@@ -335,7 +335,7 @@ struct ASREnv(Movable, Copyable):
             ramp = lincurve(self.sweep.phase, 0.0, 1.0, 0.0, 1.0, curve[1])
 
         comptime if win_type != WindowType.none:
-            ramp *= win_env[win_type, interp](self.world, ramp*0.5)
+            ramp *= win_read[win_type, interp](self.world, ramp*0.5)
 
         return ramp * sustain
 

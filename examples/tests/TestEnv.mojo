@@ -33,12 +33,12 @@ struct TestEnv(Movable, Copyable):
         line = self.line.next(0, 1.0, 0.1)
         env1 = self.envs[1].next[win_type = WindowType.hann](True, line)
         env2 = self.envs[2].next[win_type = WindowType.sine](True, line)
-        env3 = win_env[WindowType.blackman, Interp.linear](self.world, line)
+        env3 = win_read[WindowType.blackman, Interp.linear](self.world, line)
         env4 = min_env[WindowType.hann](self.world, line, 0.3)
         gate = line < 0.8
         env5 = self.asr_env.next[WindowType.kaiser](0.025, 1., 0.025, gate, line)
         
-        env6 = buf_env(self.world, self.env_buffer, line)
+        env6 = buf_read(self.world, self.env_buffer, line)
 
         return MFloat[8](env1, env2, env3, env4, env5, env6, 0., 0.) * 0.9
 

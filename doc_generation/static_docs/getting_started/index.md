@@ -43,7 +43,7 @@ Linux users may also have an issue with pyautogui. If this is the case, the best
 
 Finally, the authors successfuly gotten python venv to work with pip, but have not gotten 
 
-## 2b.1. Option 1 - Setup with pixi (On Windows, follow the instructions under 2w. first, then come back here to get Python correctly configured)
+## 2b.1. Option 1 - Setup with pixi (For Windows, go to [MMMAudio-WindowsSetup](MMMAudio-WindowsSetup.md))
 
 This is confirmed to work on Mac, but we have not yet gotten this working on Linux (use Option 2 below).
 
@@ -57,7 +57,7 @@ See [pixi's installation instructions](https://pixi.prefix.dev/latest/installati
 pixi install
 ```
 
-This should install all relevant packages.
+This should install all relevant packages. Some computers have issues with rtmidi. If this is the case, open the pixi.toml file and change the version of python from 3.13 to 3.12.
 
 ### 3 Edit the .vscode/settings.json file to have the following:
 ```
