@@ -72,6 +72,7 @@ struct Env(Movable, Copyable):
         self.params.values=[0,1,0]
         self.params.times=[1,1]
         self.eoc = False
+        self._reset_vals()
 
     @doc_hidden
     def _reset_vals(mut self):
@@ -220,7 +221,7 @@ def win_env[window_type: Int = WindowType.sine, interp: Int = Interp.none](world
     val = temp[].at_phase[window_type, interp](world, phase)
     return val
 
-def buf_env[num_chans: Int = 1, interp: Int = Interp.linear, bWrap: Bool = True](world: World, env_buffer: SIMDBuffer[num_chans], phase: MFloat[1], prev_phase: MFloat[1] = 0.0) -> MFloat[num_chans]:
+def buf_env[num_chans: Int, interp: Int = Interp.linear, bWrap: Bool = True](world: World, env_buffer: SIMDBuffer[num_chans], phase: MFloat[1], prev_phase: MFloat[1] = 0.0) -> MFloat[num_chans]:
     """Reads a buffer by indexing with the provided phase.
 
     Args:
