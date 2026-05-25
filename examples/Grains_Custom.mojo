@@ -2,16 +2,16 @@
 
 GrainBPF embeds a GrainAll and sends its output through a bandpass filter.
 
-Because the filter introduces some latency, the grain will still be active for a short time after the grain envelope has finished, until the output falls below a certain threshold.
+Because the filter introduces an impulse response, the grain will still be active for a short time after the grain envelope has finished, so we need to test the signal for when both channels get to a zero crossing and reset the filter before the next grain starts.
 """
 
 from mmm_audio import *
 
-struct GrainBPF(Grainable2):
+struct GrainBPF(Grainable):
     """A custom grain with a BPF inside each grain.
     """
     var world: World 
-    var grain: GrainAll
+    var grain: GrainAll # a custom grain needs to include a GrainAll, which holds all the grain parameters and does all the envelope and windowing work
     var start_chan: Int
     var svf: SVF[2]
     var filter_freq: Float64
@@ -33,6 +33,7 @@ struct GrainBPF(Grainable2):
         self.last_sample = MFloat[2](0.0)
 
     def check_active(mut self) -> Bool:
+        # the grain is active if either the grain envelope is active or if the output of the filter is still above a very small threshold (to account for the filter's impulse response)
         if self.grain.check_active():
             return True
         elif abs(self.last_sample[0]) > 1e-06 or abs(self.last_sample[1]) > 1e-06:
@@ -40,10 +41,12 @@ struct GrainBPF(Grainable2):
         else:
             return False
 
+    # the following functions are needed in all Grainable objects. In general, you can copy and paste these and change the items below listed as being for this example
+
     def set_trigger(mut self, trigger: Bool):
         self.grain.set_trigger(trigger)
         if trigger:
-            self.svf.reset()
+            self.svf.reset() # this needs to be in this example, but may not need to be your implementation
     
     def set_env_trigger(mut self, trigger: Bool):
         self.grain.set_env_trigger(trigger)
@@ -64,7 +67,9 @@ struct GrainBPF(Grainable2):
     filter_freq: Float64 = 200.,
     q: Float64 = 1.0
     ):
-        self.grain.set_vals(rate, start_frame, duration, pan, gain)
+        self.grain.set_vals(rate, start_frame, duration, pan, gain) # this is the general grain parameter setting function
+        
+        # these are custom for this example, but may be different in your implementation
         self.start_chan = start_chan
         self.filter_freq = filter_freq
         self.q = q
@@ -73,10 +78,11 @@ struct GrainBPF(Grainable2):
             return self.svf.bpf(sample, self.filter_freq, self.q)
 
     @always_inline
-    def next[num_buf_chans: Int, num_playback_chans: Int = 1, win_type: Int = WindowType.hann, custom_curve: Int = WindowType.hann, bWrap: Bool = False](mut self, buffer: SIMDBuffer[num_buf_chans]) -> MFloat[2]:
+    # this is a stereo grain, but you can make a pan_az grain by making a .next_az function instead
+    def next_2[num_buf_chans: Int, num_playback_chans: Int = 1, win_type: Int = WindowType.hann, custom_curve: Int = WindowType.hann, bWrap: Bool = False](mut self, buffer: SIMDBuffer[num_buf_chans]) -> MFloat[2]:
         
         # get all the channels from the grain
-        var sample = self.grain.next[win_type=win_type, custom_curve=custom_curve, bWrap=bWrap](buffer)
+        var sample = self.grain.next_all[win_type=win_type, custom_curve=custom_curve, bWrap=bWrap](buffer)
 
         comptime if num_playback_chans == 1:
             panned = pan2(sample[self.start_chan], self.grain.pan)
@@ -93,7 +99,7 @@ struct Grains_Custom(Movable, Copyable):
     var world: World
     var buffer: SIMDBuffer[2]
     
-    var tgrains: TGrains2[8, GrainBPF, WindowType.user_defined, WindowType.hann]
+    var tgrains: TGrains[8, GrainBPF, WindowType.user_defined, WindowType.hann]
     var impulse: Phasor[1]  
     var start_frame: Float64
     var m: Messenger
@@ -106,7 +112,7 @@ struct Grains_Custom(Movable, Copyable):
         # buffer uses numpy to load a buffer into an N channel array
         self.buffer = SIMDBuffer[2].load("resources/Shiverer.wav")
 
-        self.tgrains = TGrains2[8, GrainBPF, WindowType.user_defined, WindowType.hann](self.world)  
+        self.tgrains = TGrains[8, GrainBPF, WindowType.user_defined, WindowType.hann](self.world)  
         self.impulse = Phasor[1](self.world)
         self.m = Messenger(world)
         self.max_trig_rate = 20.0
@@ -131,9 +137,10 @@ struct Grains_Custom(Movable, Copyable):
 
         start_frame = Int(linlin(self.world[].mouse_x, 0.0, 1.0, 0.0, Float64(self.buffer.num_frames) - 1.0))
 
+        # to make this work we need to: 1) trigger the grain, 2) set the grain parameters (including the custom ones), and 3) call next on tgrains to get the output sample. this way you guarantee that all values are set before the grain starts processing audio
         grain_num = self.tgrains.trig(impulse)
         if grain_num >= 0:
             self.tgrains.grains[grain_num].set_vals(1, start_frame, 0.1, random_float64(-1.0, 1.0), 1.0, 0, exprand(200., 8000.), rrand(5.0, 10.0))
-        out = self.tgrains.next[2](self.buffer, 1.0)
+        out = self.tgrains.next_2[2](self.buffer, 1.0)
 
         return MFloat[2](out[0], out[1])
