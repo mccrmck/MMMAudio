@@ -20,4 +20,14 @@ mmm_audio.send_float("max_trig_rate", 80.0)
 
 mmm_audio.stop_audio()
 
-mmm_audio.plot(20000)
+# the below version is the same except it uses a custom grain with a BandPass filter embedded directly in the grain
+
+from mmm_python import *
+mmm_audio = MMMAudio(128, out_device="BlackHole 16ch", num_output_channels = 2, graph_name="Grains_Custom", package_name="examples")
+mmm_audio.start_audio() 
+
+mmm_audio.send_floats("times", [0.2, 0.2])
+
+MMMAudio.get_audio_devices()
+
+dbamp(-120)

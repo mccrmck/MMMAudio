@@ -9,8 +9,8 @@ struct Grains(Movable, Copyable):
     var world: World
     var buffer: SIMDBuffer[2]
     
-    var tgrains: TGrains # set the number of simultaneous grains by setting the max_grains parameter here
-    var tgrains2: TGrains 
+    var tgrains: TGrains2[100] # set the number of simultaneous grains by setting the max_grains parameter here
+    var tgrains2: TGrains2[100]
     var impulse: Phasor[1]  
     var start_frame: Float64
     var m: Messenger
@@ -23,8 +23,8 @@ struct Grains(Movable, Copyable):
         # buffer uses numpy to load a buffer into an N channel array
         self.buffer = SIMDBuffer[2].load("resources/Shiverer.wav")
 
-        self.tgrains = TGrains(10, 100, world)  
-        self.tgrains2 = TGrains(10, 100, world)
+        self.tgrains = TGrains2[100](self.world)  
+        self.tgrains2 = TGrains2[100](self.world)
         self.impulse = Phasor[1](self.world)
         self.m = Messenger(world)
         self.max_trig_rate = 20.0
@@ -41,21 +41,15 @@ struct Grains(Movable, Copyable):
         if c1 or c2 or c3:
             self.tgrains.set_env_params(self.env_params)
 
-        imp_freq = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, self.max_trig_rate)  # Map mouse Y to a trigger frequency between 1 Hz and max_trig_rate
+        imp_freq = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, self.max_trig_rate)
         var impulse = self.impulse.next_bool(imp_freq, 0, True)
 
         start_frame = Int(linlin(self.world[].mouse_x, 0.0, 1.0, 0.0, Float64(self.buffer.num_frames) - 1.0))
-        # if there are 2 (or fewer) output channels, pan the stereo buffer out to 2 channels by panning the stereo playback with pan2
-        # if there are more than 2 output channels, pan each of the 2 channels separately and randomly pan each grain channel to a different speaker
+
         comptime if num_output_chans == 2:
-            out = self.tgrains.next[2, WindowType.user_defined](self.buffer, 1, impulse, start_frame, 0.4, random_float64(-1.0, 1.0), 1.0)
+            grain_num = self.tgrains.trig(impulse)
+            if grain_num >= 0:
+                self.tgrains.grains[grain_num].set_vals(1, start_frame, 0.4, random_float64(-1.0, 1.0), 1.0, 0)
+            out = self.tgrains.next[2](self.buffer)
 
             return MFloat[num_simd_chans](out[0], out[1])
-        else:
-            pass
-            # for > 2 output channels, uncomment these lines to use the next_pan_az method
-            # pan each channel separately to num_output_chans speakers
-            # out_az1 = self.tgrains.next_pan_az[num_simd_chans=num_simd_chans](self.buffer, 1, impulse, start_frame, 0.4, random_float64(-1.0, 1.0), 1.0, num_output_chans, 0)
-            # out_az2 = self.tgrains2.next_pan_az[num_simd_chans=num_simd_chans](self.buffer, 1, impulse, start_frame, 0.4, random_float64(-1.0, 1.0), 1.0, num_output_chans, 1)
-  
-            # return out_az1 + out_az2

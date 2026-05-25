@@ -178,8 +178,56 @@ struct Play(Movable, Copyable):
     def reset_phase(mut self):
         self.impulse.phase = 0.0
 
+trait GrainableLegacy(PolyObject):
+    """Trait for objects that can be used as grains in the TGrains struct for triggered granular synthesis."""
 
-struct Grain(PolyObject):
+    def __init__(out self, world: World):
+        ...
+
+    def next[num_chans: Int = 1, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
+    buffer: SIMDBuffer[num_chans], 
+    rate: Float64 = 1.0, 
+    loop: Bool = False, 
+    start_frame: Int = 0, 
+    duration: Float64 = 0.0,
+    pan: Float64 = 0.0,
+    gain: Float64 = 1.0) -> MFloat[num_chans]:
+        return 0.0
+
+    def next_pan2[num_playback_chans: Int = 1, win_type: Int = 0, bWrap: Bool = False](mut self, 
+    buffer: SIMDBuffer,
+    rate: Float64 = 1.0, 
+    loop: Bool = False, 
+    start_frame: Int = 0, 
+    duration: Float64 = 0.0, 
+    pan: Float64 = 0.0, 
+    gain: Float64 = 1.0,
+    start_chan: Int = 0
+    ) -> MFloat[2]:
+        return 0.0
+
+    def next_pan_az[num_simd_chans: Int = 4, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
+    buffer: SIMDBuffer, 
+    rate: Float64 = 1.0, 
+    loop: Bool = False, 
+    start_frame: Int = 0, 
+    duration: Float64 = 0.0, 
+    pan: Float64 = 0.0, 
+    gain: Float64 = 1.0, 
+    num_speakers: Int = 4,
+    buffer_chan: Int = 0, ) -> MFloat[num_simd_chans]:
+        return 0.0
+
+    def set_env_trigger(mut self, trigger: Bool):
+        pass
+
+    def get_env_trigger(mut self) -> Bool:
+        return False
+
+    def set_user_defined_env(mut self, env_params: EnvParams):
+        pass
+
+struct GrainLegacy(GrainableLegacy):
     """A single grain for granular synthesis.
 
     Used as part of the TGrains and the PitchShift structs for triggered granular synthesis.
@@ -208,6 +256,15 @@ struct Grain(PolyObject):
     def set_trigger(mut self, trigger: Bool):
         self.trigger = trigger
     # ------------------------------------------------
+
+    def set_env_trigger(mut self, trigger: Bool):
+        self.env_trigger = trigger
+
+    def get_env_trigger(self) -> Bool:
+        return self.env_trigger
+
+    def set_user_defined_env(mut self, env_params: EnvParams):
+        self.user_defined_env.params = env_params.copy()
 
     def __init__(out self, world: World):
         """
@@ -352,17 +409,18 @@ struct Grain(PolyObject):
         return sample
         
 
-struct TGrains(Movable, Copyable):
+struct TGrainsLegacy[max_grains: Int = 1, T: GrainableLegacy = GrainLegacy](Movable, Copyable):
     """
     Triggered granular synthesis. Each trigger starts a new grain.
     """
-    var grains: List[Grain] 
+    var grains: List[Self.T] 
     var trig: Bool
     var world: World
     var poly: PolyTriggerSig
     var env_params: EnvParams
+    var grain_index: Int
 
-    def __init__(out self, num_grains: Int, max_grains: Int, world: World):
+    def __init__(out self, world: World):
         """
 
         Args:
@@ -371,12 +429,13 @@ struct TGrains(Movable, Copyable):
             world: Pointer to the MMMWorld instance.
         """
         self.world = world  
-        self.grains = List[Grain]() 
-        for _ in range(num_grains):
-            self.grains.append(Grain(world)) 
+        self.grains = List[Self.T]() 
+        for _ in range(Self.max_grains):
+            self.grains.append(Self.T(world)) 
         self.trig = False  
-        self.poly = PolyTriggerSig(num_grains, max_grains)  
+        self.poly = PolyTriggerSig(Self.max_grains, Self.max_grains)  
         self.env_params = EnvParams()  # Initialize with default parameters
+        self.grain_index = -1
 
     def set_env_params(mut self, env_params: EnvParams):
         """Set a the EnvParams of a user-defined envelope for all grains. This allows you to use a custom envelope shape instead of the built-in window types. Will update each grain on its next trigger. (Setting the EnvParams directly will not work).
@@ -387,19 +446,19 @@ struct TGrains(Movable, Copyable):
         self.env_params = env_params.copy()
         # set all the grains to update their user_defined_env with the new env on the next trigger
         for ref grain in self.grains:
-            grain.env_trigger = True
+            grain.set_env_trigger(True)
 
     @doc_hidden
     def _trig_grain[win_type: Int](mut self, trig: Bool):
         comptime if win_type == WindowType.user_defined:            
-            grain_num = self.poly.next(self.grains, trig)
-            if grain_num >= 0:
-                # print("Triggering grain number: ", grain_num)
-                if self.grains[grain_num].env_trigger and trig:
-                    self.grains[grain_num].user_defined_env.params = self.env_params.copy()
-                    self.grains[grain_num].env_trigger = False
+            self.grain_index = self.poly.next(self.grains, trig)
+            if self.grain_index >= 0:
+                # print("Triggering grain number: ", self.grain_index)
+                if self.grains[self.grain_index].get_env_trigger() and trig:
+                    self.grains[self.grain_index].set_user_defined_env(self.env_params.copy())
+                    self.grains[self.grain_index].set_env_trigger(False)
         else:
-            _ = self.poly.next(self.grains, trig)
+            self.grain_index = self.poly.next(self.grains, trig)
 
     @always_inline
     def next[num_playback_chans: Int = 1, win_type: Int = WindowType.hann, bWrap: Bool = False](mut self, 
@@ -516,10 +575,7 @@ struct TGrains(Movable, Copyable):
                 out += self.grains[i].next[num_chans, win_type, bWrap=bWrap](buffer, rate, False, start_frame, duration, gain)
 
         return out
-    
-    def reset(mut self):
-        for ref grain in self.grains:
-            grain.play_buf.active = False
+
 
 
 struct PitchShift[num_chans: Int = 1, win_type: Int = WindowType.hann](Movable, Copyable):

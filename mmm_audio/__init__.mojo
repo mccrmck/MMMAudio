@@ -33,6 +33,7 @@ from .FFT_Functions import *
 from .ComplexFFTProcess_Module import *
 from .Polyphony import *
 from .Patterns import *
+from .Grains import *
 
 from std.random import random_float64, random_si64
 from std.math import *

@@ -360,7 +360,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable):
         Args:
             input: The input signal to process.
             frequency: The center frequency of the bandpass filter.
-            q: The bandwidth of the filter.
+            q: The bandwidth of the filter. Higher numbers == narrower filter.
 
         Returns:
             The next sample of the filtered output.
