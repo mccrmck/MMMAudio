@@ -40,20 +40,23 @@ struct OscVoice(PolyObject):
     def next(mut self, ref buffer: SIMDBuffer) -> MFloat[1]:
         osc_frac = self.tri.next[OscType.triangle](self.wubb_rate, 0.75, trig=self.gate) * 0.5 + 0.5
         return self.osc.next_vwt(buffer, self.freq, osc_frac = osc_frac) * self.env.next[WindowType.hann, Interp.linear](0.01,0.2,0.7,self.gate,2) * self.vol
-
+        
 struct WavetableOscSIMD(Movable, Copyable):
+    comptime num_voices = 16
     comptime wavetables_per_channel = 8
     comptime num_messages = 10
 
-    var world: World  
+    var world: World
+
+    var poly: Poly
     var voices: List[OscVoice]
+
     var buffer: SIMDBuffer[Self.wavetables_per_channel]
     var file_name: String
     var messenger: Messenger
     var filter_cutoff: Float64
     var filter_resonance: Float64
     var moog_filter: VAMoogLadder[1,1]
-    var poly: PolyGate
 
 
     def __init__(out self, world: World):
@@ -61,13 +64,14 @@ struct WavetableOscSIMD(Movable, Copyable):
         self.file_name = "resources/small_wavetable8.wav"
         
         self.buffer = SIMDBuffer[Self.wavetables_per_channel].load(self.file_name, num_wavetables=self.wavetables_per_channel)
-        self.voices = [OscVoice(self.world, "voice_"+String(i)) for i in range(8)]
         
-        self.messenger = Messenger(world)
+        self.poly = Poly(self.world, Self.num_voices, "poly")
+        self.voices = [OscVoice(self.world) for _ in range(self.num_voices)]
+
+        self.messenger = Messenger(self.world)
         self.filter_cutoff = 20000.0
         self.filter_resonance = 0.5
         self.moog_filter = VAMoogLadder[1,1](self.world)
-        self.poly = PolyGate(8, 16, world, "poly")
 
     def loadBuffer(mut self):
         self.buffer = SIMDBuffer[Self.wavetables_per_channel].load(self.file_name, num_wavetables=self.wavetables_per_channel)
@@ -85,8 +89,8 @@ struct WavetableOscSIMD(Movable, Copyable):
                 poly_object.freq = midicps(midi)
                 poly_object.vol = Float64(vals[1]) / 127.0
         # the poly has an internal Messenger that receives messages from Python. these have to be in the form of a List[Float64] or a List[Int]
-        # for next_gate, the first value in the list is the note to trigger and the second value is the velocity or volume of the note, where 0 denotes a note off message. the callback function receives the list of ints or floats as the second argument, so the PolyObject can be controlled by the message from Python.
-        self.poly.next[call_back=callback](self.voices)
+        # for next_mgate, the first value in the list is the note to trigger and the second value is the velocity or volume of the note, where 0 denotes a note off message. the callback function receives the list of ints or floats as the second argument, so the PolyObject can be controlled by the message from Python.
+        self.poly.next_mgate[call_back=callback](self.voices)
         
         # add the output of all the voices
         var out = 0.0
@@ -100,6 +104,6 @@ struct WavetableOscSIMD(Movable, Copyable):
         if got_wubbed:
             for ref voice in self.voices:
                 voice.wubb_rate = wubb_rate
-        sample = self.moog_filter.next(out, self.filter_cutoff, self.filter_resonance)
+        out = self.moog_filter.next(out, self.filter_cutoff, self.filter_resonance)
 
-        return sample * 0.5
+        return out * 0.5

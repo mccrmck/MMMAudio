@@ -60,18 +60,19 @@ struct TrigSynthVoice(PolyObject):
 struct MidiSequencer(Movable, Copyable):
     comptime num_messages = 10
 
-    var world: World 
-    var voices: List[TrigSynthVoice]
+    var world: World
     var current_voice: Int
     var messenger: Messenger
     var num_voices: Int
     var svf: SVF[]
     var filt_lag: Lag[]
     var filt_freq: Float64
-    var bend_mul: Float64
-    var poly: PolyTrigger
+    var bend_mul: Float64 
 
-    def __init__(out self, world: World, num_voices: Int = 8):
+    var voices: List[TrigSynthVoice]
+    var poly: Poly
+
+    def __init__(out self, world: World, num_voices: Int = 64):
         self.world = world
         self.num_voices = num_voices
         self.current_voice = 0
@@ -84,7 +85,7 @@ struct MidiSequencer(Movable, Copyable):
         self.filt_lag = Lag(self.world, 0.1)
         self.filt_freq = 1000.0
         self.bend_mul = 1.0
-        self.poly = PolyTrigger(initial_num_voices=num_voices, max_voices=64, world=world, name_space="poly")
+        self.poly = Poly(world, num_voices, "poly")
 
     @always_inline
     def next(mut self) -> MFloat[2]:
@@ -94,9 +95,9 @@ struct MidiSequencer(Movable, Copyable):
         def call_back(mut voice: TrigSynthVoice, mut vals: List[Float64]) capturing -> None:
             voice.note = [vals[0], vals[1]]
         # the poly has an internal Messenger that receives messages from Python. these have to be in the form of a List[Float64] or a List[Int]. the callback function receives the list of ints or floats as the second argument, so the PolyObject can be controlled by the message from Python.
-        self.poly.next[call_back=call_back](self.voices)
+        self.poly.next_mtrig[call_back=call_back](self.voices)
 
-        # add the values of the voices that are not being triggered 
+        # add the values of all the voices
         for i in range(len(self.voices)):
             out += self.voices[i].next()
 

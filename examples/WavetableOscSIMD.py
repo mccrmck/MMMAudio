@@ -24,7 +24,7 @@ def main():
     in_port = mido.open_input('Oxygen Pro Mini USB MIDI')
 
     # PolyPal correctly formats messages to be sent to a Synth that uses a Poly object
-    poly_pal = PolyPal(mmm_audio, "poly", 10)
+    poly_pal = PolyPal(mmm_audio, "poly", 16) # the 16 here should match the number of voices in the Poly in the Mojo code
 
     # Create stop event
     global stop_event

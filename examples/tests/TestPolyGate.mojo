@@ -1,7 +1,7 @@
 
 from mmm_audio import *
 
-struct PGSVoice(PolyObject):
+struct PGVoice(PolyObject):
     var world: World
     var env: ASREnv
     var synth: Osc[]
@@ -20,9 +20,6 @@ struct PGSVoice(PolyObject):
             self.freq = exprand(100., 1000.)
             self.pan = rrand(-1., 1.)
 
-    def reset_env(mut self):
-        self.env = ASREnv(self.world)
-
     def __init__(out self, world: World):
         self.world = world
         self.env = ASREnv(self.world)
@@ -40,22 +37,23 @@ struct PGSVoice(PolyObject):
         return env * pan2(sample, self.pan) * 0.1
 
 
-struct TestPolyGateSig(Movable, Copyable):
-    comptime num_gates: Int = 8
+struct TestPolyGate(Movable, Copyable):
+    comptime num_gates: Int = 4
+    comptime num_voices: Int = 16
 
-    var psg_voices: List[PGSVoice]
+    var psg_voices: List[PGVoice]
     var world: World
     var gates: List[Dust[]]
-    var poly_gated_sigs: PolyGateSig
+    var poly: Poly
     var gated_sigs: List[Bool]
     var m: Messenger
     var dust_vals: List[Float64]
 
     def __init__(out self, world: World):
-        self.psg_voices = [PGSVoice(world) for _ in range(self.num_gates)]
+        self.psg_voices = [PGVoice(world) for _ in range(self.num_voices)]
         self.world = world
         self.gates = [Dust(self.world) for _ in range(self.num_gates)]
-        self.poly_gated_sigs = PolyGateSig(initial_num_voices=8, max_voices=16, num_gates=self.num_gates)
+        self.poly = Poly(self.world, self.num_voices)
         self.gated_sigs = [False for _ in range(Self.num_gates)]
         self.m = Messenger(world)
         self.dust_vals = [1.0, 2.0]
@@ -65,7 +63,9 @@ struct TestPolyGateSig(Movable, Copyable):
         for i in range(Self.num_gates):
             if self.gates[i].next_bool(self.dust_vals[0], self.dust_vals[1]): self.gated_sigs[i] = not self.gated_sigs[i]
 
-        self.poly_gated_sigs.next(self.psg_voices, self.gated_sigs)
+        # interpret the gates
+        self.poly.next_gate(self.psg_voices, self.gated_sigs)
+        # sum the voices
         out = MFloat[2](0.0, 0.0)
         for ref voice in self.psg_voices:
             out += voice.next()

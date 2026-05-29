@@ -256,8 +256,16 @@ class PolyPal:
     Has send_float, send_floats, send_int, and send_ints methods.
     """
 
-    def __init__(self, mmm_audio, name_space, num_voices):
-        self.name_space = name_space
+    def __init__(self, mmm_audio, namespace, num_voices):
+        """A helper class for communication with a MMMAudio synth that uses the Poly object.
+        
+        Args:
+            mmm_audio: An instance of MMMAudio to send messages through.
+            namespace: The base name space for the Poly object.
+            num_voices: The number of voices in the Poly object, used to cycle through voice numbers when sending messages.
+        """
+
+        self.name_space = namespace
         self.seq = Pseq(list(range(num_voices)))
         self.mmm_audio = mmm_audio
         self.num = 0

@@ -1,7 +1,7 @@
 """
 A sequenced polyphonic synthesizer controlled via a MIDI keyboard.
 
-This example demonstrates a couple differnt concepts:
+This example demonstrates a couple different concepts:
 - How to Pseq and Pxrand from mmm_python.Patterns to create sequences of notes and other parameters.
 - How to create a coroutine to schedule note triggers using the MMMAudio scheduler.
 
@@ -21,7 +21,7 @@ if True:
     global scheduler
     scheduler = Scheduler()
 
-    poly_pal = PolyPal(mmm_audio, "poly", 10)
+    poly_pal = PolyPal(mmm_audio, "poly", 64)
     filter_seq = Pseq([linexp(i/100, 0, 1, 100, 5000) for i in range(0, 101)] + [linexp(i/100, 0, 1, 4999, 101) for i in range(0, 101)])
     mmm_audio.send_float("filt_freq", filter_seq.next()) # update filter frequency before each note
 
@@ -47,7 +47,7 @@ async def trig_synth(wait):
             mult_seq = Pseq(list(range(1, count_to + 1)))
 
 # start the routine with the scheduler
-rout = scheduler.sched(trig_synth(0.04))
+rout = scheduler.sched(trig_synth(0.05))
 rout.cancel() # stop just this routine
 
 # stop all routines

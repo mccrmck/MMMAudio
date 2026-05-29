@@ -7,7 +7,7 @@ Because the filter introduces an impulse response, the grain will still be activ
 
 from mmm_audio import *
 
-struct GrainBPF(Grainable):
+struct GrainBPF(GrainObject):
     """A custom grain with a BPF inside each grain.
     """
     var world: World 
@@ -41,7 +41,7 @@ struct GrainBPF(Grainable):
         else:
             return False
 
-    # the following functions are needed in all Grainable objects. In general, you can copy and paste these and change the items below listed as being for this example
+    # the following functions are needed in all GrainObject objects. In general, you can copy and paste these and change the items below listed as being for this example
 
     def set_trigger(mut self, trigger: Bool):
         self.grain.set_trigger(trigger)
@@ -99,7 +99,7 @@ struct Grains_Custom(Movable, Copyable):
     var world: World
     var buffer: SIMDBuffer[2]
     
-    var tgrains: TGrains[8, GrainBPF, WindowType.user_defined, WindowType.hann]
+    var tgrains: TGrains[GrainBPF, WindowType.user_defined, WindowType.hann]
     var impulse: Phasor[1]  
     var start_frame: Float64
     var m: Messenger
@@ -112,7 +112,7 @@ struct Grains_Custom(Movable, Copyable):
         # buffer uses numpy to load a buffer into an N channel array
         self.buffer = SIMDBuffer[2].load("resources/Shiverer.wav")
 
-        self.tgrains = TGrains[8, GrainBPF, WindowType.user_defined, WindowType.hann](self.world)  
+        self.tgrains = TGrains[GrainBPF, WindowType.user_defined, WindowType.hann](self.world, 8)  
         self.impulse = Phasor[1](self.world)
         self.m = Messenger(world)
         self.max_trig_rate = 20.0

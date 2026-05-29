@@ -12,6 +12,6 @@ mmm_audio.send_string("file_name", "tmp/Man_short.wav")
 mmm_audio.send_float("dur_mult", 10.0)
 mmm_audio.send_float("dur_mult", 100.0)
 mmm_audio.send_float("dur_mult", 40.0)
-mmm_audio.send_float("dur_mult", 10000.0)
+mmm_audio.send_float("dur_mult", 1000.0)
 
 mmm_audio.stop_audio()

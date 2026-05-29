@@ -19,10 +19,6 @@ struct OscVoice(PolyObject):
     def set_gate(mut self, gate: Bool):
         self.gate = gate
 
-    # necessary to ensure a fresh env when the voice is copied by Poly
-    def reset_env(mut self):
-        self.env = ASREnv(self.world)
-
     def __init__(out self, world: World, name_space: String = ""):
         self.osc = Osc[1,Interp.sinc,0](world)
         self.tri = LFOsc(world)
@@ -42,6 +38,7 @@ struct OscVoice(PolyObject):
 struct WavetableOscSIMDStrings(Movable, Copyable):
     comptime wavetables_per_channel = 8
     comptime num_messages = 10
+    comptime num_voices = 16
 
     var world: World  
     var voices: List[OscVoice]
@@ -51,20 +48,21 @@ struct WavetableOscSIMDStrings(Movable, Copyable):
     var filter_cutoff: Float64
     var filter_resonance: Float64
     var moog_filter: VAMoogLadder[1,1]
-    var poly: PolyGate
+    var poly: Poly
 
     def __init__(out self, world: World):
         self.world = world
         self.file_name = "resources/small_wavetable8.wav"
         
         self.buffer = SIMDBuffer[Self.wavetables_per_channel].load(self.file_name, num_wavetables=self.wavetables_per_channel)
-        self.voices = [OscVoice(self.world, "voice_"+String(i)) for i in range(8)]
+
+        self.voices = [OscVoice(self.world, "voice_"+String(i)) for i in range(Self.num_voices)]
+        self.poly = Poly(self.world, Self.num_voices, "poly")
         
         self.messenger = Messenger(world)
         self.filter_cutoff = 20000.0
         self.filter_resonance = 0.5
         self.moog_filter = VAMoogLadder[1,1](self.world)
-        self.poly = PolyGate(8, 16, world, "poly")
 
     def loadBuffer(mut self):
         self.buffer = SIMDBuffer[Self.wavetables_per_channel].load(self.file_name, num_wavetables=self.wavetables_per_channel)
@@ -80,8 +78,8 @@ struct WavetableOscSIMDStrings(Movable, Copyable):
                 poly_object.freq = midicps(Float64(vals[0]))
                 poly_object.vol = vals[1] / 127.0
         # the poly has an internal Messenger that receives messages from Python. these have to be in the form of a List[Float64] or a List[Int]
-        # for next_gate, the first value in the list is the note to trigger and the second value is the velocity or volume of the note, where 0 denotes a note off message. the callback function receives the list of ints or floats as the second argument, so the PolyObject can be controlled by the message from Python.
-        self.poly.next[call_back=callback](self.voices)
+        # for next_mgate, the first value in the list is the note to trigger and the second value is the velocity or volume of the note, where 0 denotes a note off message. the callback function receives the list of ints or floats as the second argument, so the PolyObject can be controlled by the message from Python.
+        self.poly.next_mgate[call_back=callback](self.voices)
         
         # add the output of all the voices
         var out = 0.0
