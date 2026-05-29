@@ -1,4 +1,4 @@
-"""Contains a Multi-Layer Perceptron (MLP) implementation using PyTorch and the train_nn function to train the network."""
+"""Contains a Multi-Layer Perceptron (MLP) implementation using PyTorch and the train_new_mlp function to train the network."""
 
 import torch
 import time
@@ -47,7 +47,13 @@ class MLP(nn.Module):
         """Get the output size of the MLP."""
         return self.output_size
     
-def train_nn(X_train_list: list[list[float]], y_train_list: list[list[float]], layers: list[tuple[int, str | None]], learn_rate: float, epochs: int, file_name: str):
+activations = {
+    'relu': nn.ReLU(),
+    'sigmoid': nn.Sigmoid(),
+    'tanh': nn.Tanh()
+}
+    
+def train_new_mlp(X_train_list: list[list[float]], y_train_list: list[list[float]], layers: list[tuple[int, str | None]], learn_rate: float, epochs: int, file_name: str):
     """Train the MLP and save the trained model.
 
     Args:
@@ -65,23 +71,15 @@ def train_nn(X_train_list: list[list[float]], y_train_list: list[list[float]], l
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-
     print(layers)
 
     for i, vals in enumerate(layers):
         print(f"Layer {i}: {vals}")
         val, activation = vals
         if activation is not None:
-            if activation == 'relu':
-                activation = nn.ReLU()
-            elif activation == 'sigmoid':
-                activation = nn.Sigmoid()
-            elif activation == 'tanh':
-                activation = nn.Tanh()
-            else:
-                raise ValueError("Activation function not recognized.")
-        layers[i] = [val, activation]
+            activation = activations[activation]
 
+        layers[i] = [val, activation]
 
     print(layers)
 

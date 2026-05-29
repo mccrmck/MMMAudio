@@ -7,14 +7,13 @@ synth.
 You can also train the Multi-Layer Perceptron by creating any number of input/output pairs and making a new training. When training the MLP, temporarily disable the MLP inference so you can set the synth parameters directly.
 """
 
-if True:
-    from mmm_python import *
-    from random import random
+from mmm_python import *
+from random import random
 
-    mmm_audio = MMMAudio(128, in_device=None, graph_name="TorchMlp", package_name="examples")
+mmm_audio = MMMAudio(128, in_device=None, graph_name="TorchMlp", package_name="examples")
 
-    # this one is a bit intense, so maybe start with a low volume
-    mmm_audio.start_audio()
+# this one is a bit intense, so maybe start with a low volume
+mmm_audio.start_audio()
 
 # below is the code to make a new training --------------------------------
 
@@ -80,10 +79,10 @@ def do_the_training():
 
     # train the network in a separate thread so the audio thread doesn't get interrupted
 
-    from mmm_audio.MLP_Python import train_nn
+    from mmm_audio.MLP_Python import train_new_mlp
     import threading
 
-    target_function = train_nn
+    target_function = train_new_mlp
     args = (X_train_list, y_train_list, layers, learn_rate, epochs, "examples/nn_trainings/model_traced.pt")
 
     # Create a Thread object
