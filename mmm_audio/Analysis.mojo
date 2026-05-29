@@ -1411,7 +1411,7 @@ struct TopNFreqs(FFTProcessable, GetFloat64Featurable):
 
         for i in range(self.num_peaks):
             index = self.output_peak_indices[i]
-            if i < n_valid_peaks and index > 0 and index < len(mags) - 1:
+            if i < n_valid_peaks:
                 a_db = ampdb(MFloat[4](mags[index-1], mags[index], mags[index+1], 0.0))
                 val, mag = find_quadratic_peak(a_db[0], a_db[1], a_db[2])
                 offset = val - 1.0
