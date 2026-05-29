@@ -636,6 +636,16 @@ def test_expexp2() raises:
         py_answer.append(py_to_float64(mmm_python.expexp(x[i], 1.0, 10.0, 10.0, 0.001)))
         assert_almost_equal(result[i], py_answer[i], "Test: expexp mismatch at index " + String(i))
         
+def test_select_files() raises:
+    files = select_files("mmm_audio", [".mojo"])
+    expected_files = ["mmm_audio/Delays.mojo", "mmm_audio/FFTs.mojo"]
+    for expected in expected_files:
+        assert_true(expected in files, "Test: select_files missing expected file " + expected)
+
+    files2 = select_files("resources", [".wav"])
+    expected_files2 = ["resources/Growl 15.wav","resources/Shiverer.wav","resources/small_wavetable.wav","resources/small_wavetable8.wav"]
+    for expected in expected_files2:
+        assert_true(expected in files2, "Test: select_files missing expected file " + expected)
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
-    # test_mel_bands()

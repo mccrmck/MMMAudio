@@ -958,3 +958,26 @@ def Li2[num_chans: Int](x: MFloat[num_chans]) -> MFloat[num_chans]:
     var q = horner[num_chans, Q](z)
 
     return r + s * y * p / q
+
+# TODO: add recursion
+def select_files(dir: String, extensions: List[String] = [".wav",".aif"]) -> List[String]:
+    """Select files with specified extensions from a directory and return their paths as a list of strings.
+
+    Args:
+        dir: The directory (as a `String`) to search for files.
+        extensions: A list of file extensions to include (as a `List[String]`). They must include the dot (e.g., ".wav").
+
+    Returns:
+        A `List[String]` of file paths that match the specified extensions.
+    """
+    path_dir = Path(dir)
+    paths: List[String] = List[String]()
+    try:
+        for f in path_dir.listdir():
+            fp: Path = path_dir.joinpath(String(f))
+            if f.suffix() in extensions:
+                paths.append(String(fp))
+        sort(paths)
+        return paths^
+    except e:
+        abort("select_files: " + String(e))
