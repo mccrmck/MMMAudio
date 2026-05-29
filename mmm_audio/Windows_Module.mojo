@@ -44,6 +44,9 @@ struct Windows(Movable, Copyable):
         elif window_type == WindowType.sine:
             comptime for chan in range(num_chans):
                 out[chan] = SpanInterpolator.read[1,interp,True,self.mask](world,self.sine, phase[chan] * self.size_f64, prev_phase[chan] * self.size_f64)
+        elif window_type == WindowType.gaussian:
+            comptime for chan in range(num_chans):
+                out[chan] = SpanInterpolator.read[1,interp,True,self.mask](world,self.gaussian, phase[chan] * self.size_f64, prev_phase[chan] * self.size_f64)
         elif window_type == WindowType.rect:
             out = 1.0 
         elif window_type == WindowType.tri:
