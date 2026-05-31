@@ -205,7 +205,8 @@ struct WindowType(Equatable, ImplicitlyCopyable):
     def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
-struct OscType:
+@fieldwise_init
+struct OscType(Equatable, ImplicitlyCopyable):
     """Oscillator types for selecting waveform types.
 
     Specify an oscillator type by typing it explicitly.
@@ -219,7 +220,17 @@ struct OscType:
     | OscType.saw                  | 2     |
     | OscType.square               | 3     |
     """
+    var _value: Int
+
     comptime sine: MInt[1] = 0
     comptime triangle: MInt[1] = 1
     comptime saw: MInt[1] = 2
     comptime square: MInt[1] = 3
+
+    @doc_hidden
+    def __eq__(self, other: Self) -> Bool:
+        return self._value == other._value
+
+    @doc_hidden
+    def __ne__(self, other: Self) -> Bool:
+        return not (self == other)
