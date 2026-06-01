@@ -102,6 +102,14 @@ struct Phasor[num_chans: Int = 1, os_index: Int = 0](Movable, Copyable):
 
         return self.next_bool(freq, phase_offset, trig).cast[DType.float64]()
 
+    def set_looped_times_oversampling(mut self, times_oversampling: Int):
+        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
+
+        Args:
+            times_oversampling: The new oversampling multiplier (1 for no oversampling, 2 for 2x, 4 for 4x, etc.).
+        """
+        self.freq_mul = (1.0 / self.world[].sample_rate) / Float64(times_oversampling)
+
 
 struct Impulse[num_chans: Int = 1, os_index: Int = 0](Movable, Copyable):
     """Impulse Oscillator.
@@ -123,6 +131,14 @@ struct Impulse[num_chans: Int = 1, os_index: Int = 0](Movable, Copyable):
             world: Pointer to the MMMWorld instance.
         """
         self.phasor = Phasor[self.num_chans, Self.os_index](world)
+
+    def set_looped_times_oversampling(mut self, times_oversampling: Int):
+        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
+
+        Args:
+            times_oversampling: The new oversampling multiplier (1 for no oversampling, 2 for 2x, 4 for 4x, etc.).
+        """
+        self.phasor.set_looped_times_oversampling(times_oversampling)
 
     @always_inline
     def next_bool(mut self, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: MBool[self.num_chans] = MBool[self.num_chans](fill=True)) -> MBool[self.num_chans]:
@@ -184,6 +200,14 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, os_index: Int = 0
         self.phasor = Phasor[self.num_chans, Self.os_index](self.world)
         self.oversampling = Oversampling[self.num_chans, 2**Self.os_index](self.world)
         self.last_phase = MFloat[self.num_chans](0.0)
+
+    def set_looped_times_oversampling(mut self, times_oversampling: Int):
+        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
+
+        Args:
+            times_oversampling: The new oversampling multiplier (1 for no oversampling, 2 for 2x, 4 for 4x, etc.).
+        """
+        self.phasor.set_looped_times_oversampling(times_oversampling)
 
     @always_inline
     def next[osc_type: OscType = OscType.sine](

@@ -17,7 +17,7 @@ struct BuchlaWaveFolder(Movable, Copyable):
     def next(mut self) -> MFloat[2]:
         amp = self.lag.next(self.world[].mouse_x * 39.0) + 1
 
-        sample = = self.osc.next[OscType.sine](40)
+        sample = self.osc.next[OscType.sine](40)
         sample = buchla_wavefolder(sample, amp)
 
         return sample
