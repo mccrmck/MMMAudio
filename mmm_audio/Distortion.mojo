@@ -64,7 +64,7 @@ struct Latch[num_chans: Int = 1](Copyable, Movable):
 # [TODO] implement 2nd order ADAA versions of hard clip, soft clip, tanh
 # [TODO] implement a parameter in the .next functions to choose between none, and 1st and 2nd order ADAA
 
-struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyable, Movable):
+struct SoftClipAD[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.none, degree: Int = 3](Copyable, Movable):
     """
     Anti-Derivative Anti-aliasing soft-clipping function.
     
@@ -72,13 +72,12 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
     
     Parameters:
         num_chans: The number of channels for SIMD operations.
-        os_index: The oversampling index (0 = no oversampling, 1 = 2x, 2 = 4x, 3 = 8x, 4 = 16x).
+        ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
         degree: The degree of the soft clipping polynomial (must be odd).
     """
-    comptime times_oversampling = 2 ** Self.os_index    
     var x1: MFloat[Self.num_chans]
-    var oversampling: Oversampling[Self.num_chans, Self.times_oversampling]
-    var upsampler: Upsampler[Self.num_chans, Self.times_oversampling]
+    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+    var upsampler: Upsampler[Self.num_chans, Self.ov_samp]
     var D: Float64
     var norm_factor: Float64
     var inv_norm_factor: Float64
@@ -88,10 +87,10 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
 
     def __init__(out self, world: World):
         self.x1 = MFloat[Self.num_chans](0.0)
-        if Self.os_index > 1:
-            print("SoftClipAD: os_index greater than 1 not supported yet. It will not sound good.")
-        self.oversampling = Oversampling[Self.num_chans, Self.times_oversampling](world)
-        self.upsampler = Upsampler[Self.num_chans, 2 ** Self.os_index](world)
+        if Self.ov_samp.times > 2:
+            print("SoftClipAD: ov_samp greater than x2 not supported yet. It will not sound good.")
+        self.oversampling = Oversampling[Self.num_chans, self.ov_samp](world)
+        self.upsampler = Upsampler[Self.num_chans, self.ov_samp](world)
         self.D = Float64(Self.degree // 2 * 2 + 1)  # ensure degree is odd
         self.norm_factor = (self.D - 1) / self.D
         self.inv_norm_factor = 1.0 / self.norm_factor
@@ -149,7 +148,7 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
     def next(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
         """First-order anti-aliased `hard_clip`.
 
-        Computes the first-order anti-aliased `hard_clip` of `x`. If the os_index is greater than 0, oversampling is applied to the processing.
+        Computes the first-order anti-aliased `hard_clip` of `x`. If the ov_samp is greater than 0, oversampling is applied to the processing.
 
         Args:
             x: The input sample.
@@ -157,15 +156,15 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
         Returns:
             The anti-aliased `soft_clip` of `x`.
         """
-        if not self.initialized:
-            self.x1 = x
-            self.initialized = True
-            return self._next_norm(x)
+        # if not self.initialized:
+        #     self.x1 = x
+        #     self.initialized = True
+        #     return self._next_norm(x)
 
-        comptime if Self.os_index == 0:
+        comptime if Self.ov_samp == TimesOversampling.none:
             return self._next1(x)
         else:
-            comptime for i in range(self.times_oversampling):
+            comptime for i in range(Self.ov_samp.times):
                 # upsample the input
                 x2 = self.upsampler.next(x, i)
                 y = self._next1(x2)
@@ -180,7 +179,7 @@ def soft_clip[num_chans: Int](x: MFloat[num_chans], min_val: MFloat[num_chans] =
     var clipped = normalized / (1.0 + abs(normalized))
     return center + clipped * range
 
-struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
+struct HardClipAD[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.none](Copyable, Movable):
     """
     Anti-Derivative Anti-aliasing hard-clipping function.
     
@@ -188,12 +187,12 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
     
     Parameters:
         num_chans: The number of channels for SIMD operations.
-        os_index: The oversampling index (0 = no oversampling, 1 = 2x, 2 = 4x, 3 = 8x, 4 = 16x).
+        ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
     """
     var x1: MFloat[Self.num_chans]
     var x2: MFloat[Self.num_chans]
-    var oversampling: Oversampling[Self.num_chans, 2 ** Self.os_index]
-    var upsampler: Upsampler[Self.num_chans, 2 ** Self.os_index]
+    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+    var upsampler: Upsampler[Self.num_chans, Self.ov_samp]
     comptime TOL = 1.0e-5
     var initialized: Bool
 
@@ -205,8 +204,8 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
         """
         self.x1 = MFloat[Self.num_chans](0.0)
         self.x2 = MFloat[Self.num_chans](0.0)
-        self.oversampling = Oversampling[Self.num_chans, 2 ** Self.os_index](world)
-        self.upsampler = Upsampler[Self.num_chans, 2 ** Self.os_index](world)
+        self.oversampling = Oversampling[Self.num_chans, Self.ov_samp](world)
+        self.upsampler = Upsampler[Self.num_chans, Self.ov_samp](world)
         self.initialized = False
 
     @doc_hidden
@@ -267,7 +266,7 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
     def next(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
         """First-order anti-aliased `hard_clip`.
 
-        Computes the first-order anti-aliased `hard_clip` of `x`. If the os_index is greater than 0, oversampling is applied to the processing.
+        Computes the first-order anti-aliased `hard_clip` of `x`. If the ov_samp is greater than 0, oversampling is applied to the processing.
 
         Args:
             x: The input sample.
@@ -275,35 +274,34 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
         Returns:
             The anti-aliased `hard_clip` of `x`.
         """
-        if not self.initialized:
-            self.x1 = x
-            self.initialized = True
-            return tanh(x)
-        comptime if Self.os_index == 0:
+        # if not self.initialized:
+        #     self.x1 = x
+        #     self.initialized = True
+        #     return tanh(x)
+        comptime if Self.ov_samp == TimesOversampling.none:
             return self._next1(x)
         else:
-            comptime times_oversampling = 2 ** Self.os_index
-            comptime for i in range(times_oversampling):
+            comptime for i in range(Self.ov_samp.times):
                 # upsample the input
                 x2 = self.upsampler.next(x, i)
                 y = self._next1(x2)
                 self.oversampling.add_sample(y)
             return self.oversampling.get_sample()
 
-struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable, Resettable):
+struct TanhAD[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.none](Copyable, Movable, Resettable):
     """Anti-Derivative Anti-aliasing first order tanh function.
     
     This struct provides a first order anti-aliased version of the `tanh` function using the Anti-Derivative Anti-aliasing (ADAA) method with optional Oversampling. See [Practical Considerations for Antiderivative Anti-aliasing (Chowdhury)](https://ccrma.stanford.edu/~jatin/Notebooks/adaa.html) for more details on how this works.
 
     Parameters:
         num_chans: The number of channels for SIMD operations.
-        os_index: The oversampling index (0 = no oversampling, 1 = 2x, 2 = 4x, etc.).
+        ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
     """
 
     var x1: MFloat[Self.num_chans]
     comptime TOL = 1.0e-5
-    var oversampling: Oversampling[Self.num_chans, 2 ** Self.os_index]
-    var upsampler: Upsampler[Self.num_chans, 2 ** Self.os_index]
+    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+    var upsampler: Upsampler[Self.num_chans, Self.ov_samp]
     var initialized: Bool
 
     def __init__(out self, world: World):
@@ -313,8 +311,8 @@ struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable, Resettab
             world: A pointer to the MMMWorld.
         """
         self.x1 = MFloat[Self.num_chans](0.0)
-        self.oversampling = Oversampling[Self.num_chans, 2 ** Self.os_index](world)
-        self.upsampler = Upsampler[Self.num_chans, 2 ** Self.os_index](world)
+        self.oversampling = Oversampling[Self.num_chans, Self.ov_samp](world)
+        self.upsampler = Upsampler[Self.num_chans, Self.ov_samp](world)
         self.initialized = False
 
     @doc_hidden
@@ -362,15 +360,15 @@ struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable, Resettab
         Returns:
             The anti-aliased `tanh` of `x`.
         """
-        if not self.initialized:
-            self.x1 = x
-            self.initialized = True
-            return tanh(x)
-        comptime if Self.os_index == 0:
+        # if not self.initialized:
+        #     self.x1 = x
+        #     self.initialized = True
+        #     return tanh(x)
+
+        comptime if Self.ov_samp == TimesOversampling.none:
             return self._next1(x)
         else:
-            comptime times_oversampling = 2 ** Self.os_index
-            comptime for i in range(times_oversampling):
+            comptime for i in range(Self.ov_samp.times):
                 # upsample the input
                 x2 = self.upsampler.next(x, i)
                 y = self._next1(x2)
@@ -453,14 +451,14 @@ struct BuchlaCell[num_chans: Int = 1](Copyable, Movable):
     #                 - self.Bpp * sgn)
     #     return 0.0
 
-struct BuchlaWavefolder[num_chans: Int = 1, os_index: Int = 1](Copyable, Movable):
+struct BuchlaWavefolder[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.x2](Copyable, Movable):
     """Buchla 259 style Wavefolder.
     
     Buchla 259 style wavefolder implementation with Anti-Derivative Anti-aliasing (ADAA) and Oversampling. Derived from Virual Analog Buchla 259e Wavefolderby Esqueda, etc. The ADAA technique is based on [Practical Considerations for Antiderivative Anti-aliasing (Chowdhury)](https://ccrma.stanford.edu/~jatin/Notebooks/adaa.html).
     
     Parameters:
         num_chans: The number of channels for SIMD operations.
-        os_index: The oversampling index (0 = no oversampling, 1 = 2x, 2 = 4x, etc.).
+        ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
     """
     
     comptime x_mix: Float64 = 5.0
@@ -468,8 +466,8 @@ struct BuchlaWavefolder[num_chans: Int = 1, os_index: Int = 1](Copyable, Movable
     comptime TOL: Float64 = 1.0e-5
     var x1: MFloat[Self.num_chans]
     var world: World
-    var oversampling: Oversampling[Self.num_chans, 2 ** Self.os_index]
-    var upsampler: Upsampler[Self.num_chans, 2 ** Self.os_index]
+    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+    var upsampler: Upsampler[Self.num_chans, Self.ov_samp]
 
     def __init__(out self, world: World):
         """Initialize the BuchlaWavefolder.
@@ -486,8 +484,8 @@ struct BuchlaWavefolder[num_chans: Int = 1, os_index: Int = 1](Copyable, Movable
         self.cells.append(BuchlaCell[Self.num_chans](0.2829, 1.5446, 5.46, -21.428))
         self.cells.append(BuchlaCell[Self.num_chans](0.5743, 1.0338, 1.8, 17.647))
         self.cells.append(BuchlaCell[Self.num_chans](0.2673, 1.0907, 4.08, 36.363))
-        self.oversampling = Oversampling[Self.num_chans, 2 ** Self.os_index](world)
-        self.upsampler = Upsampler[Self.num_chans, 2 ** Self.os_index](world)
+        self.oversampling = Oversampling[Self.num_chans, Self.ov_samp](world)
+        self.upsampler = Upsampler[Self.num_chans, Self.ov_samp](world)
 
     @doc_hidden
     def _next_norm(self, x: MFloat[Self.num_chans], amp: Float64) -> MFloat[Self.num_chans]:
@@ -538,7 +536,7 @@ struct BuchlaWavefolder[num_chans: Int = 1, os_index: Int = 1](Copyable, Movable
     def next(mut self, x: MFloat[Self.num_chans], amp: Float64) -> MFloat[Self.num_chans]:
         """First-order anti-aliased BuchlaWavefolder.
 
-        Computes the first-order anti-aliased BuchlaWavefolder. If the os_index is greater than 0, oversampling is applied to the processing.
+        Computes the first-order anti-aliased BuchlaWavefolder. If the ov_samp is greater than 0, oversampling is applied to the processing.
 
         Args:
             x: The input sample.
@@ -547,11 +545,10 @@ struct BuchlaWavefolder[num_chans: Int = 1, os_index: Int = 1](Copyable, Movable
         Returns:
             The anti-aliased `hard_clip` of `x`.
         """
-        comptime if Self.os_index == 0:
+        comptime if Self.ov_samp == TimesOversampling.none:
             return self._next1(x, amp)
         else:
-            comptime times_oversampling = 2 ** Self.os_index
-            comptime for i in range(times_oversampling):
+            comptime for i in range(Self.ov_samp.times):
                 # upsample the input
                 x2 = self.upsampler.next(x, i)
                 y = self._next1(x2, amp)

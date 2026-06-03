@@ -427,23 +427,23 @@ struct Allpass[num_chans: Int = 1, interp: Interp = Interp.linear](Tapable, Rese
         self.delay.reset()
         
 
-struct FB_Delay[num_chans: Int = 1, interp: Interp = Interp.lagrange4, ADAA_dist: Bool = False, os_index: Int = 0](Tapable, Resettable):
+struct FB_Delay[num_chans: Int = 1, interp: Interp = Interp.lagrange4, ADAA_dist: Bool = False, ov_samp: TimesOversampling = TimesOversampling.none](Tapable, Resettable):
     """A feedback delay structured like a Comb filter, but with possible feedback coefficient above 1 due to an integrated tanh function.
     
-    By default, Anti-aliasing is disabled and no [oversampling](Oversampling.md) is applied, but this can be changed by setting the ADAA_dist and os_index template parameters.
+    By default, Anti-aliasing is disabled and no [oversampling](Oversampling.md) is applied, but this can be changed by setting the ADAA_dist and ov_samp template parameters.
     
     Parameters:
       num_chans: Size of the SIMD vector.
       interp: The interpolation method to use. See the struct [Interp](MMMWorld.md#struct-interp) for interpolation options.
       ADAA_dist: Whether to apply ADAA distortion to the feedback signal instead of standard tanh.
-      os_index: The [oversampling](Oversampling.md) index for ADAA distortion. 0 = no oversampling, 1 = 2x, 2 = 4x, 3 = 8x, 4 = 16x.
+      ov_samp: The [oversampling](MMMWorld.md#struct-timesoversampling) for ADAA distortion.
     """
 
     var world: World
     var delay: Delay[Self.num_chans, Self.interp]
     var dc: DCTrap[Self.num_chans]
     var fb: MFloat[Self.num_chans]
-    var tanh_ad: TanhAD[Self.num_chans, Self.os_index]
+    var tanh_ad: TanhAD[Self.num_chans, Self.ov_samp]
 
     def __init__(out self, world: World, max_delay_time: Float64 = 1.0):
       """Initialize the FB_Delay.
@@ -457,7 +457,7 @@ struct FB_Delay[num_chans: Int = 1, interp: Interp = Interp.lagrange4, ADAA_dist
         self.delay = Delay[Self.num_chans, Self.interp](self.world, max_delay_time)
         self.dc = DCTrap[Self.num_chans](self.world)
         self.fb = MFloat[Self.num_chans](0.0)
-        self.tanh_ad = TanhAD[Self.num_chans, Self.os_index](self.world)
+        self.tanh_ad = TanhAD[Self.num_chans, Self.ov_samp](self.world)
 
     def tap(mut self, delay_samps: MInt[Self.num_chans]) -> MFloat[Self.num_chans]:
         return self.delay.tap(delay_samps)

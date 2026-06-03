@@ -73,6 +73,7 @@ nav:
       - Recorder: api/Recorder.md
       - Reverbs & Delay FX: api/ReverbsDelayFX.md
       - Sound File I/O: api/sound_file.md
+      - Synthesizers: api/Synthesizers.md
       - Utilities: api/functions.md
       - Sinc Interpolation: api/SincInterpolator.md
     - Core Framework:

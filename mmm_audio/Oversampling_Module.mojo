@@ -1,14 +1,14 @@
 from mmm_audio import *
 
-struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Copyable, Resettable):
+struct Oversampling[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.none](Movable, Copyable, Resettable):
     """A struct that collects ` times_oversampling` samples and then downsamples them using a low-pass filter. Add a sample for each oversampling iteration with `add_sample()`, then get the downsampled output with `get_sample()`.
 
     Parameters:
         num_chans: Number of channels for the oversampling buffer.
-        times_oversampling: The oversampling factor (e.g., 2 for 2x oversampling).
+        ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
     """
 
-    var buffer: InlineArray[MFloat[Self.num_chans], Self.times_oversampling]  # Buffer for oversampled values
+    var buffer: InlineArray[MFloat[Self.num_chans], Self.ov_samp.times]  # Buffer for oversampled values
     var counter: Int
     var lpf: OS_LPF4[Self.num_chans]
 
@@ -19,9 +19,9 @@ struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Co
             world: Pointer to the MMMWorld instance.
         """
         self.lpf = OS_LPF4[self.num_chans](world)
-        self.buffer = InlineArray[MFloat[Self.num_chans], Self.times_oversampling](fill=MFloat[Self.num_chans](0.0))
+        self.buffer = InlineArray[MFloat[Self.num_chans], Self.ov_samp.times](fill=MFloat[Self.num_chans](0.0))
         self.counter = 0
-        self.lpf.set_sample_rate(world[].sample_rate * MFloat[1](Self.times_oversampling))
+        self.lpf.set_sample_rate(world[].sample_rate * MFloat[1](Self.ov_samp.times))
         
         self.lpf.set_cutoff(0.48 * world[].sample_rate)
 
@@ -40,7 +40,7 @@ struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Co
         """Get the next sample from a filled oversampling buffer."""
         out = MFloat[self.num_chans](0.0)
         if self.counter > 1:
-            for i in range(Self.times_oversampling):
+            for i in range(Self.ov_samp.times):
                 out = self.lpf.next(self.buffer[i]) # Lowpass filter each sample
         else:
             out = self.buffer[0]
@@ -51,12 +51,12 @@ struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Co
         """Reset the internal state of the upsampler."""
         self.lpf.reset()
         
-struct Upsampler[num_chans: Int = 1, times_oversampling: Int = 1](Movable, Copyable, Resettable):
+struct Upsampler[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.x2](Movable, Copyable, Resettable):
     """A struct that upsamples the input signal by the specified factor using a low-pass filter.
 
     Parameters:
         num_chans: Number of channels for the upsampler.
-        times_oversampling: The oversampling factor (e.g., 2 for 2x oversampling).
+        ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
     """
     var lpf: OS_LPF4[Self.num_chans]
 
@@ -67,7 +67,7 @@ struct Upsampler[num_chans: Int = 1, times_oversampling: Int = 1](Movable, Copya
             world: Pointer to the MMMWorld instance.
         """
         self.lpf = OS_LPF4[Self.num_chans](world)
-        self.lpf.set_sample_rate(world[].sample_rate * MFloat[1](Self.times_oversampling))
+        self.lpf.set_sample_rate(world[].sample_rate * MFloat[1](Self.ov_samp.times))
         self.lpf.set_cutoff(0.5 * world[].sample_rate)
 
     @always_inline
@@ -82,9 +82,9 @@ struct Upsampler[num_chans: Int = 1, times_oversampling: Int = 1](Movable, Copya
             The next sample of the upsampled output.
         """
         if i == 0:
-            return self.lpf.next(input) * MFloat[1](Self.times_oversampling)
+            return self.lpf.next(input) * MFloat[1](Self.ov_samp.times)
         else:
-            return self.lpf.next(MFloat[Self.num_chans](0.0)) * MFloat[1](Self.times_oversampling)
+            return self.lpf.next(MFloat[Self.num_chans](0.0)) * MFloat[1](Self.ov_samp.times)
 
     def reset(mut self):
         """Reset the internal state of the upsampler."""
