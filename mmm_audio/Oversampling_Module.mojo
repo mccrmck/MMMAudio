@@ -1,6 +1,6 @@
 from mmm_audio import *
 
-struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Copyable):
+struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Copyable, Resettable):
     """A struct that collects ` times_oversampling` samples and then downsamples them using a low-pass filter. Add a sample for each oversampling iteration with `add_sample()`, then get the downsampled output with `get_sample()`.
 
     Parameters:
@@ -46,8 +46,12 @@ struct Oversampling[num_chans: Int = 1, times_oversampling: Int = 0](Movable, Co
             out = self.buffer[0]
         self.counter = 0
         return out
+
+    def reset(mut self):
+        """Reset the internal state of the upsampler."""
+        self.lpf.reset()
         
-struct Upsampler[num_chans: Int = 1, times_oversampling: Int = 1](Movable, Copyable):
+struct Upsampler[num_chans: Int = 1, times_oversampling: Int = 1](Movable, Copyable, Resettable):
     """A struct that upsamples the input signal by the specified factor using a low-pass filter.
 
     Parameters:
@@ -81,6 +85,10 @@ struct Upsampler[num_chans: Int = 1, times_oversampling: Int = 1](Movable, Copya
             return self.lpf.next(input) * MFloat[1](Self.times_oversampling)
         else:
             return self.lpf.next(MFloat[Self.num_chans](0.0)) * MFloat[1](Self.times_oversampling)
+
+    def reset(mut self):
+        """Reset the internal state of the upsampler."""
+        self.lpf.reset()
 
 struct OS_LPF[num_chans: Int = 1](Movable, Copyable):
     """A simple 2nd-order low-pass filter for oversampling applications. Does not allow changing cutoff frequency on the fly to avoid that calculation each sample.
@@ -165,6 +173,11 @@ struct OS_LPF[num_chans: Int = 1](Movable, Copyable):
         self.z2 = self.b2 * x - self.a2 * y
         return y
 
+    def reset(mut self):
+        """Reset the internal state of the low-pass filter."""
+        self.z1 = MFloat[Self.num_chans](0.0)
+        self.z2 = MFloat[Self.num_chans](0.0)
+
 struct OS_LPF4[num_chans: Int = 1](Movable, Copyable):
     """A 4th-order low-pass filter for oversampling applications, implemented as two cascaded 2nd-order sections.
     
@@ -201,3 +214,8 @@ struct OS_LPF4[num_chans: Int = 1](Movable, Copyable):
         var y = self.os_lpf1.next(x)
         y = self.os_lpf2.next(y)
         return y
+
+    def reset(mut self):
+        """Reset the internal state of the 4th-order low-pass filter."""
+        self.os_lpf1.reset()
+        self.os_lpf2.reset()

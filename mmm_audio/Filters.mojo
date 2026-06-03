@@ -15,6 +15,7 @@ struct Lag[num_chans: Int = 1](Movable, Copyable):
     var val: MFloat[Self.num_chans]
     var b1: MFloat[Self.num_chans]
     var lag: MFloat[Self.num_chans]
+    var in_samp: MFloat[Self.num_chans]
 
     def __init__(out self, world: World, lag: MFloat[Self.num_chans] = MFloat[Self.num_chans](0.02)):
         """Initialize the lag processor with given lag time in seconds.
@@ -28,6 +29,7 @@ struct Lag[num_chans: Int = 1](Movable, Copyable):
         self.val = MFloat[Self.num_chans](0.0)
         self.b1 = 0
         self.lag = 0
+        self.in_samp = MFloat[Self.num_chans](0.0)
         self.set_lag_time(lag)
         
     @always_inline
@@ -41,7 +43,21 @@ struct Lag[num_chans: Int = 1](Movable, Copyable):
             Output values after applying the lag.
         """
 
-        self.val = in_samp + self.b1 * (self.val - (in_samp))
+        self.in_samp = in_samp
+        self.val = self.in_samp + self.b1 * (self.val - (self.in_samp))
+        self.val = sanitize(self.val)
+
+        return self.val
+
+    @always_inline
+    def next(mut self) -> MFloat[Self.num_chans]:
+        """Process one sample through the lag processor. This version does not take an input argument and instead uses the last value set in self.in_samp.
+        
+        Returns:
+            Output values after applying the lag.
+        """
+
+        self.val = self.in_samp + self.b1 * (self.val - (self.in_samp))
         self.val = sanitize(self.val)
 
         return self.val
@@ -512,7 +528,7 @@ struct lpf_LR4[num_chans: Int = 1](Movable, Copyable):
         # Second stage
         return self.svf2.lpf(cf, frequency, self.q)  # Second stage
 
-struct OnePole[num_chans: Int = 1](Movable, Copyable):
+struct OnePole[num_chans: Int = 1](Movable, Copyable, Resettable):
     """One-pole IIR filter that can be configured as lowpass or highpass.
 
     Parameters:
@@ -574,6 +590,10 @@ struct OnePole[num_chans: Int = 1](Movable, Copyable):
         """Calculate feedback coefficient from cutoff frequency."""
         return exp(-2.0 * pi * cutoff_hz / self.world[].sample_rate)
 
+    def reset(mut self):
+        """Reset the one-pole filter to its initial state."""
+        self.last_samp = MFloat[Self.num_chans](0.0)
+
 @doc_hidden
 def _time_to_coef[num_chans: Int](time_s: MFloat[num_chans], sample_rate: MFloat[num_chans]) -> MFloat[num_chans]:
     mask0 = time_s.le(0.0)
@@ -630,7 +650,7 @@ struct Amplitude[num_chans: Int](Movable, Copyable):
 
         return self.last_val
 
-struct DCTrap[num_chans: Int=1](Movable, Copyable):
+struct DCTrap[num_chans: Int=1](Movable, Copyable, Resettable):
     """DC Trap filter.
     
     Implementation from Digital Sound Generation by Beat Frei. The cutoff
@@ -654,6 +674,11 @@ struct DCTrap[num_chans: Int=1](Movable, Copyable):
         self.last_samp = MFloat[Self.num_chans](0.0)
         self.last_inner = MFloat[Self.num_chans](0.0)
 
+    def reset(mut self):
+        """Reset the DC blocker filter to its initial state."""
+        self.last_samp = MFloat[Self.num_chans](0.0)
+        self.last_inner = MFloat[Self.num_chans](0.0)
+
     def next(mut self, input: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
         """Process one sample through the DC blocker filter.
         
@@ -670,7 +695,7 @@ struct DCTrap[num_chans: Int=1](Movable, Copyable):
 
         return sample
 
-struct VAOnePole[num_chans: Int = 1](Movable, Copyable):
+struct VAOnePole[num_chans: Int = 1](Movable, Copyable, Resettable):
     """
     One-pole filter based on the Virtual Analog design by 
     Vadim Zavalishin in "The Art of VA Filter Design".
@@ -728,7 +753,11 @@ struct VAOnePole[num_chans: Int = 1](Movable, Copyable):
         """
         return input - self.lpf(input, freq)
 
-struct VAMoogLadder[num_chans: Int = 1, os_index: Int = 0](Movable, Copyable):
+    def reset(mut self):
+        """Clears filter's internal state.""" 
+        self.last_1 = MFloat[Self.num_chans](0.0)
+
+struct VAMoogLadder[num_chans: Int = 1, os_index: Int = 0](Movable, Copyable, Resettable):
     """Virtual Analog Moog Ladder Filter.
     
     Implementation based on the Virtual Analog design by Vadim Zavalishin in 
@@ -857,7 +886,7 @@ struct VAMoogLadder[num_chans: Int = 1, os_index: Int = 0](Movable, Copyable):
                     self.oversampling.add_sample(lp4)
             return self.oversampling.get_sample()
 
-struct Reson[num_chans: Int = 1](Movable, Copyable):
+struct Reson[num_chans: Int = 1](Movable, Copyable, Resettable):
     """Resonant filter with lowpass, highpass, and bandpass modes.
 
     A translation of Julius Smith's Faust implementation of [tf2s (virtual analog) resonant filters](https://github.com/grame-cncm/faustlibraries/blob/6061da8bf2279ae4281333861a3dc6254e9076f9/filters.lib#L2054).
@@ -944,8 +973,12 @@ struct Reson[num_chans: Int = 1](Movable, Copyable):
 
         return self.tf2.next(input, b0d, b1d, b2d, a1d, a2d)
 
+    def reset(mut self):
+        """Reset the internal state of the Reson filter."""
+        self.tf2.reset()
+
 @doc_hidden
-struct FIR[num_chans: Int = 1](Movable, Copyable):
+struct FIR[num_chans: Int = 1](Movable, Copyable, Resettable):
     """Finite Impulse Response (FIR) filter implementation.
 
     A translation of Julius Smith's Faust implementation of digital filters.
@@ -986,8 +1019,13 @@ struct FIR[num_chans: Int = 1](Movable, Copyable):
         self.index = (self.index + 1) % len(self.buffer)
         return output
 
+    def reset(mut self):
+        """Reset the FIR filter to its initial state."""
+        self.buffer = [MFloat[Self.num_chans](0.0) for _ in range(len(self.buffer))]
+        self.index = 0
+
 @doc_hidden
-struct IIR[num_chans: Int = 1](Movable, Copyable):
+struct IIR[num_chans: Int = 1](Movable, Copyable, Resettable):
     """Infinite Impulse Response (IIR) filter implementation.
 
     A translation of Julius Smith's Faust implementation of digital filters.
@@ -1028,8 +1066,14 @@ struct IIR[num_chans: Int = 1](Movable, Copyable):
         self.fb = output1
         return output2
 
+    def reset(mut self):
+        """Reset the IIR filter to its initial state."""
+        self.fir1.reset()
+        self.fir2.reset()
+        self.fb = MFloat[Self.num_chans](0.0)
+
 @doc_hidden
-struct tf2[num_chans: Int = 1](Movable, Copyable):
+struct tf2[num_chans: Int = 1](Movable, Copyable, Resettable):
     """Second-order transfer function filter implementation.
 
     A translation of Julius Smith's Faust implementation of digital filters.
@@ -1064,6 +1108,10 @@ struct tf2[num_chans: Int = 1](Movable, Copyable):
             The next sample of the filtered output.
         """
         return self.iir.next(input, b0d, b1d, b2d, a1d, a2d)
+    
+    def reset(mut self):
+        """Reset the tf2 filter to its initial state."""
+        self.iir.reset()
 
 @doc_hidden
 @always_inline
@@ -1106,7 +1154,7 @@ struct BiquadModes:
     comptime lowshelf: Int64 = 6
     comptime highshelf: Int64 = 7
 
-struct Biquad[num_chans: Int = 1](Movable, Copyable):
+struct Biquad[num_chans: Int = 1](Movable, Copyable, Resettable):
     """A Biquad filter struct.
 
     To use the different modes, see the mode-specific methods.
@@ -1457,7 +1505,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable):
         """
         return self.next[BiquadModes.highshelf](input, frequency, q, gain_db)
 
-struct MedianFilter(Movable, Copyable):
+struct MedianFilter(Movable, Copyable, Resettable):
     """A simple median filter for scalar samples.
 
     The window size is forced to be odd and at least 1.
@@ -1497,3 +1545,11 @@ struct MedianFilter(Movable, Copyable):
             self.sorted[j + 1] = key
 
         return self.sorted[self.filled_count // 2]
+
+    def reset(mut self):
+        """Reset the median filter to its initial state."""
+        for i in range(self.size):
+            self.buffer[i] = 0.0
+            self.sorted[i] = 0.0
+        self.index = 0
+        self.filled_count = 0

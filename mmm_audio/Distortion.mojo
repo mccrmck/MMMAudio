@@ -84,6 +84,7 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
     var inv_norm_factor: Float64
     comptime TOL = 1.0e-5
     var G1: Float64
+    var initialized: Bool
 
     def __init__(out self, world: World):
         self.x1 = MFloat[Self.num_chans](0.0)
@@ -95,6 +96,7 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
         self.norm_factor = (self.D - 1) / self.D
         self.inv_norm_factor = 1.0 / self.norm_factor
         self.G1 = 1.0 / (2.0 * (self.norm_factor * self.norm_factor)) - 1.0 / ((self.norm_factor * self.norm_factor) * self.D * (self.D + 1))
+        self.initialized = False
 
     @doc_hidden
     @always_inline
@@ -139,6 +141,10 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
         self.x1 = x
         return out
 
+    def reset(mut self):
+        """Reset the internal state of the SoftClipAD."""
+        self.initialized = False
+
     @always_inline
     def next(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
         """First-order anti-aliased `hard_clip`.
@@ -151,6 +157,11 @@ struct SoftClipAD[num_chans: Int = 1, os_index: Int = 0, degree: Int = 3](Copyab
         Returns:
             The anti-aliased `soft_clip` of `x`.
         """
+        if not self.initialized:
+            self.x1 = x
+            self.initialized = True
+            return self._next_norm(x)
+
         comptime if Self.os_index == 0:
             return self._next1(x)
         else:
@@ -184,6 +195,7 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
     var oversampling: Oversampling[Self.num_chans, 2 ** Self.os_index]
     var upsampler: Upsampler[Self.num_chans, 2 ** Self.os_index]
     comptime TOL = 1.0e-5
+    var initialized: Bool
 
     def __init__(out self, world: World):
         """Initialize the HardClipAD.
@@ -195,6 +207,7 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
         self.x2 = MFloat[Self.num_chans](0.0)
         self.oversampling = Oversampling[Self.num_chans, 2 ** Self.os_index](world)
         self.upsampler = Upsampler[Self.num_chans, 2 ** Self.os_index](world)
+        self.initialized = False
 
     @doc_hidden
     @always_inline
@@ -241,10 +254,14 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
     @doc_hidden
     @always_inline
     def _next1(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
-        mask: MBool[Self.num_chans] = abs(x - self. x1).lt(self.TOL)
+        mask: MBool[Self.num_chans] = abs(x - self.x1).lt(self.TOL)
         out = mask.select(self._next_norm((x + self.x1) * 0.5), (self._next_AD1(x) - self._next_AD1(self.x1)) / (x - self.x1))
         self.x1 = x
         return out
+
+    def reset(mut self):
+        """Reset the internal state of the HardClipAD."""
+        self.initialized = False
 
     @always_inline
     def next(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -258,6 +275,10 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
         Returns:
             The anti-aliased `hard_clip` of `x`.
         """
+        if not self.initialized:
+            self.x1 = x
+            self.initialized = True
+            return tanh(x)
         comptime if Self.os_index == 0:
             return self._next1(x)
         else:
@@ -268,8 +289,8 @@ struct HardClipAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
                 y = self._next1(x2)
                 self.oversampling.add_sample(y)
             return self.oversampling.get_sample()
-    
-struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
+
+struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable, Resettable):
     """Anti-Derivative Anti-aliasing first order tanh function.
     
     This struct provides a first order anti-aliased version of the `tanh` function using the Anti-Derivative Anti-aliasing (ADAA) method with optional Oversampling. See [Practical Considerations for Antiderivative Anti-aliasing (Chowdhury)](https://ccrma.stanford.edu/~jatin/Notebooks/adaa.html) for more details on how this works.
@@ -283,6 +304,7 @@ struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
     comptime TOL = 1.0e-5
     var oversampling: Oversampling[Self.num_chans, 2 ** Self.os_index]
     var upsampler: Upsampler[Self.num_chans, 2 ** Self.os_index]
+    var initialized: Bool
 
     def __init__(out self, world: World):
         """Initialize the TanhAD.
@@ -293,6 +315,7 @@ struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
         self.x1 = MFloat[Self.num_chans](0.0)
         self.oversampling = Oversampling[Self.num_chans, 2 ** Self.os_index](world)
         self.upsampler = Upsampler[Self.num_chans, 2 ** Self.os_index](world)
+        self.initialized = False
 
     @doc_hidden
     def _next_norm(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -300,7 +323,8 @@ struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
 
     @doc_hidden
     def _next_AD1(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
-        return log (cosh (x))
+        var ax = abs(x)
+        return ax + log(1.0 + exp(-2.0 * ax)) - 0.6931471805599453
 
     def _next1(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
         """
@@ -320,18 +344,28 @@ struct TanhAD[num_chans: Int = 1, os_index: Int = 0](Copyable, Movable):
         self.x1 = x
         return out
     
+    def reset(mut self):
+        """Reset the internal state of the TanhAD."""
+        self.initialized = False
+        self.oversampling.reset()
+        self.upsampler.reset()
+
     @always_inline
     def next(mut self, x: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
-        """First-order anti-aliased `hard_clip`.
+        """First-order anti-aliased `tanh`.
 
-        Computes the first-order anti-aliased `hard_clip` of `x` using the ADAA method. If the os_index is greater than 0, oversampling is applied to the processing.
+        Computes the first-order anti-aliased `tanh` of `x` using the ADAA method. If the os_index is greater than 0, oversampling is applied to the processing.
 
         Args:
             x: The input sample.
 
         Returns:
-            The anti-aliased `hard_clip` of `x`.
+            The anti-aliased `tanh` of `x`.
         """
+        if not self.initialized:
+            self.x1 = x
+            self.initialized = True
+            return tanh(x)
         comptime if Self.os_index == 0:
             return self._next1(x)
         else:
