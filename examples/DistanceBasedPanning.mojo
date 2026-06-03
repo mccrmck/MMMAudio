@@ -35,11 +35,11 @@ struct DbapSynth(Movable, Copyable):
 
         sig = self.filt.bpf(sig, 1200, 10.0, 1.0)
         out = dbap2D[4, speakers, weights](sig, self.pos)
-
+        out2 = MFloat[4](out[0], out[1], out[2], out[4])
         # uncomment below for use the phase of the Dust oscillator instead of the impulse
         # out = self.dust.get_phase()
 
-        return MFloat[4](out[0], out[1], out[2], out[4])
+        return out2
 
 # THE GRAPH
 
