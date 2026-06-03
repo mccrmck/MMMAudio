@@ -50,7 +50,6 @@ trait PolyObject(Movable, Copyable):
         comptime for idx in range(r.field_count()):
             comptime comptime_field_type = types[idx]
             comptime if conforms_to(comptime_field_type, PolyReset):
-                print("Resetting field:", names[idx])
                 r.field_ref[idx](self).reset()
 
 trait PolyReset():
