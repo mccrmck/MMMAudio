@@ -67,6 +67,9 @@ struct Windows(Movable, Copyable):
         Args:
             size: Length of the window.
             beta: Shape parameter only used for Kaiser window. See kaiser_window() for details.
+
+        Returns:
+            List[Float64] of length `size` containing the window values.
         """
         comptime if window_type == WindowType.rect:
             return rect_window(size)
