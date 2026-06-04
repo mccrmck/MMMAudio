@@ -9,6 +9,7 @@ struct DistanceBasedPanning(Movable, Copyable):
     var pos: MFloat[2]
     var filt: Reson[1]
 
+
     def __init__(out self, world: World):
         self.world = world
         self.dust = Dust[1](world)
@@ -17,6 +18,8 @@ struct DistanceBasedPanning(Movable, Copyable):
         self.pos = [0, 0]
 
     def next(mut self) -> MFloat[8]:
+        comptime max_simd = 8
+
         # self.messenger.update("pos", self.pos)
         self.pos[0] = linlin(self.world[].mouse_x, 0.0, 1.0, -1.0, 1.0)
         self.pos[1] = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, -1.0)
@@ -36,10 +39,10 @@ struct DistanceBasedPanning(Movable, Copyable):
         sig = self.dust.next(10, 40) * 0.5
         sig = self.filt.bpf(sig, 1200, 10.0, 1.0)
 
-        out = dbap2D[4, speakers, weights](sig, self.pos, 0.5)
-        out2 = MFloat[8](out[0], out[1], out[2], out[3], 0.0, 0.0, 0.0, 0.0)
+        out = dbap2D[4, max_simd, speakers, weights](sig, self.pos, 0.5)
+        
 
-        # 7 speaker setup
+        #7 speaker setup
 
         # comptime speakers : InlineArray[MFloat[2], 7] = [
         #     MFloat[2](-0.66, 1),
@@ -57,7 +60,7 @@ struct DistanceBasedPanning(Movable, Copyable):
         # sig = self.dust.next(10, 40) * 0.5
         # sig = self.filt.bpf(sig, 1200, 10.0, 1.0)
 
-        # out = dbap2D[7, speakers, weights](sig, self.pos, 0.5)
-        # out2 = MFloat[8](out[0], out[1], out[2], 0.0, out[3], out[4], out[5], out[6])
+        # out = dbap2D[7, max_simd, speakers, weights](sig, self.pos, 0.5)
+        
 
-        return out2 * 0.5
+        return out * 0.5

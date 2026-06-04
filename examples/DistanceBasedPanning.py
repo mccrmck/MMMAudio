@@ -7,7 +7,7 @@ The position of the audio source is controlled by the mouse. The corners of the 
 from mmm_python import * 
 
 # instantiate and load the graph
-mmm_audio = MMMAudio(128, num_output_channels=4, graph_name="DistanceBasedPanning", package_name="examples")
+mmm_audio = MMMAudio(128, num_output_channels=8, graph_name="DistanceBasedPanning", package_name="examples")
 
 
 mmm_audio.start_audio()
