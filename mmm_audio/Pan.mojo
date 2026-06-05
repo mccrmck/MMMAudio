@@ -346,7 +346,7 @@ def dbap2D[
         rolloff: Float64 = 6
     ) -> MFloat[simd_out_size]:
     """
-    Implements DBAP (Distance Based Amplitude Panning). Takes in a mono signal and produces a signal of arbitrary channel size.
+    Implements DBAP (Distance Based Amplitude Panning). Pans a mono sample to N speakers of arbitrary positions in meters.
     For more on DBAP see the paper written by Trond Lossius, Pascal Baltazar, and Theo de la Hague.
     https://jamoma.org/publications/attachments/icmc2009-dbap-rev1.pdf .
 
