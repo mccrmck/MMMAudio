@@ -2,7 +2,10 @@ from mmm_audio import *
 
 trait PolyObject(Movable, Copyable):
     def check_active(mut self) -> Bool:
-        """A required, user defind function to check if the voice is active. This is usually done by checking if the envelope is active or if the Line has reached its end. This function is used internally by Poly to keep track of which voices are active and which are not.
+        """A required, user defined function to check if the voice is active. This is usually done by checking if the envelope is active or if the Line has reached its end. This function is used internally by Poly to keep track of which voices are active and which are not.
+
+        Returns:
+            True when the voice is active, otherwise False.
         """
         ...
 
@@ -67,13 +70,12 @@ struct Poly(Movable, Copyable):
     var int_dict: Dict[Int, Int]
 
     def __init__(out self, world: World, num_voices: Int, namespace: Optional[String] = None):
-        """
-        Poly init function.
+        """Initialize the Poly.
 
         Args:
-            world: World object from MMMAudio.
-            num_voices: Number of voices in the Poly object. This is the maximum number of voices that can be active at once. If all voices are active and a new trigger is received, the trigger will be ignored. You can increase the number of voices with the set_num_voices function, but you cannot decrease the number of voices after initialization.
-            namespace: The namespace for the Messenger. Only necessary if you want to trigger the Poly with messages from Python.
+            world: Pointer to the MMMWorld instance.
+            num_voices: The number of voices in the Poly object. This is the maximum number of voices that can be active at once. If all voices are active and a new trigger is received, the trigger will be ignored. You can increase the number of voices with the set_num_voices function, but you cannot decrease the number of voices after initialization.
+            namespace: Optional message namespace for the internal Messenger.
         """
         self.num_voices = num_voices
         self.active_list = [False for _ in range(self.num_voices)]
@@ -203,11 +205,14 @@ struct Poly(Movable, Copyable):
     def next_gate[T: PolyObject](mut self, mut poly_objects: List[T], gate_sigs: List[Bool]) -> Int:
         """This function is designed to be used with polyphonic synths that have gated controls that are signals.
 
+        Parameters:
+            T: The PolyObject type stored in `poly_objects`.
+
         Args:
             poly_objects: A list of structs conforming to the PolyObject trait. This function calls the set_gate function for each PolyObject to open and close the gates as needed.
             gate_sigs: A list of boolean signals that control the gates of the voices. This number should be less than or equal to the number of voices in the Poly. Remember that even if a gate is closed that does not mean the voice is free. The voice is free when the envelope or Line of the voice is finished and the check_active function returns False again. Plan the number of gates and voices accordingly.
-        
-        Return:
+
+        Returns:
             The index of the voice whose gate was opened, or -1 if no voice was opened.
         """
         self._reset[audio_control = 0](poly_objects)
@@ -379,11 +384,29 @@ trait GrainObject(PolyObject):
     """Trait for objects that can be used as grains in the TGrains struct for triggered granular synthesis."""
 
     def __init__(out self, world: World):
-        """An __init__ with this layout must be implemented for the GrainObject trait."""
+        """Initialize a GrainObject implementation.
+
+        Args:
+            world: Pointer to the MMMWorld instance.
+        """
         ...
 
     def next_2[num_buf_chans: Int, num_playback_chans: Int = 2, win_type: WindowType = WindowType.hann, custom_curve: WindowType = WindowType.none, bWrap: Bool = False](mut self, buffer: SIMDBuffer[num_buf_chans]) -> MFloat[2]:
-        """This is the function to create if you want to output 2 channels using pan2 or pan_stereo."""
+        """This is the function to create if you want to output 2 channels using pan2 or pan_stereo.
+
+        Parameters:
+            num_buf_chans: Number of channels in the source buffer.
+            num_playback_chans: Number of source channels to play back before panning.
+            win_type: Window type applied to the grain.
+            custom_curve: Optional custom curve for user-defined envelopes.
+            bWrap: Whether reads wrap around the source buffer.
+
+        Args:
+            buffer: Source buffer for grain playback.
+
+        Returns:
+            The next stereo grain sample.
+        """
         return 0.0
 
     def next_az[num_buf_chans: Int, num_out_chans: Int, win_type: WindowType = WindowType.hann, custom_curve: WindowType = WindowType.none, bWrap: Bool = False](mut self, buffer: SIMDBuffer[num_buf_chans], buffer_chan: Int = 0, num_speakers: Int = 2, width: Float64 = 2.0, orientation: Float64 = 0.5) -> MFloat[num_out_chans]:
@@ -407,7 +430,11 @@ trait GrainObject(PolyObject):
         return False
 
     def set_user_defined_env(mut self, env_points: Span[Tuple[Float64, Float64], ...]):
-        """Should probably just be: self.grain.set_user_defined_env(env_points)."""
+        """Should probably just be: self.grain.set_user_defined_env(env_points).
+        
+        Args:
+            env_points: A list of (time, value) tuples that define the user defined envelope. The times and values should be between 0 and 1.
+        """
         ...
 
     def reset(mut self):
@@ -499,14 +526,15 @@ struct GrainAll(GrainObject):
         self.pan = pan
 
     def next_all[num_chans: Int, win_type: WindowType = WindowType.hann, custom_curve: WindowType = WindowType.none, bWrap: Bool = False](mut self, buffer: SIMDBuffer[num_chans]) -> MFloat[num_chans]:
-        """Get the next sample of the grain. This function returns all channels of the buffer with no panning.
-
+        """
+        Get the next sample of the grain. This function returns all channels of the buffer with no panning.
+        
         Parameters:
             num_chans: The number of channels in the buffer. This is inferred at compile time based on the channel count of the SIMDBuffer that is passed in.
             win_type: The type of window to apply to the grain. A hann window is used by default, and will give the classic granular synthesis sound. If win_type is WindowType.user_defined, then the user_defined_env (env) will be used as the window.
             custom_curve: If win_type is WindowType.user_defined, applies a custom curve to the user defined envelope. This is the win_type parameter of the Env next function.
             bWrap: Whether to wrap around the buffer when reading. If false, the grain will read 0 when it reaches the end of the buffer. If true, the grain will wrap around to the beginning of the buffer when it reaches the end.
-
+        
         Args:
             buffer: A SIMDBuffer to read from.
 
@@ -544,8 +572,7 @@ struct Grain(GrainObject):
     var start_chan: Int
 
     def __init__(out self, world: World):
-        """
-        Init function for the Grain struct.
+        """Initialize the grain.
 
         Args:
             world: Pointer to the MMMWorld instance.
@@ -598,16 +625,22 @@ struct Grain(GrainObject):
         self.grain.set_vals(rate, start_frame, duration, pan, gain)
         self.start_chan = start_chan
 
-    def next_2[num_buf_chans: Int, num_playback_chans: Int = 2, win_type: WindowType = WindowType.hann, custom_curve: WindowType = WindowType.none, bWrap: Bool = False](mut self, buffer: SIMDBuffer[num_buf_chans]) -> MFloat[2]:
+    def next_2[
+        num_buf_chans: Int, 
+        num_playback_chans: Int = 2, 
+        win_type: WindowType = WindowType.hann, 
+        custom_curve: WindowType = WindowType.none, 
+        bWrap: Bool = False
+    ](mut self, buffer: SIMDBuffer[num_buf_chans]) -> MFloat[2]:
         """Get the next sample of the grain as a stereo signal with panning.
-
+        
         Parameters:
             num_buf_chans: The number of channels in the buffer. This is inferred at compile time based on the channel count of the SIMDBuffer that is passed in.
             num_playback_chans: Either 1 or 2, depending on whether you want to pan 1 channel of the buffer out 2 channels or 2 channels of the buffer with equal power panning.
             win_type: The type of window to apply to the grain. A hann window is used by default, and will give the classic granular synthesis sound. If win_type is WindowType.user_defined, then the user_defined_env (Env) will be used as the window.
             custom_curve: If win_type is WindowType.user_defined, applies a custom curve to the user defined envelope. This is the win_type parameter of the Env next function.
             bWrap: Whether to wrap around the buffer when reading. If false, the grain will read 0 when it reaches the end of the buffer. If true, the grain will wrap around to the beginning of the buffer when it reaches the end.
-
+        
         Args:
             buffer: A SIMDBuffer to read from.
 
@@ -768,7 +801,7 @@ struct TGrains[T: GrainObject = Grain[], win_type: WindowType = WindowType.hann,
             gain: Amplitude scaling factor for the output of the grains.
 
         Returns:
-            Output samples for left and right channels as a SIMD vector.
+            Output samples for the left and right channels.
         """
 
         out = MFloat[2](0.0)
@@ -893,7 +926,7 @@ struct PitchShift[num_chans: Int = 1, win_type: WindowType = WindowType.hann](Mo
     @always_inline
     def next(mut self, in_sig: MFloat[Self.num_chans], grain_dur: Float64 = 0.2, overlaps: Int = 4, pitch_ratio: Float64 = 1.0, pitch_dispersion: Float64 = 0.0, time_dispersion: Float64 = 0.0, added_delay_low: Float64 = 0.0, added_delay_high: Float64 = 0.0, gain: Float64 = 1.0) -> MFloat[Self.num_chans]:
         """Generate the next set of grains for pitch shifting.
-
+        
         Args:
             in_sig: Input signal to be pitch shifted.
             grain_dur: Duration of each grain in seconds.

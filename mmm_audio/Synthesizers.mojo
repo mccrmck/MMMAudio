@@ -32,7 +32,8 @@ struct PAF[
     var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
 
     def __init__(out self, world: World):
-        """
+        """Initialize the phase-aligned formant synthesizer.
+
         Args:
             world: Pointer to the MMMWorld instance.
         """
