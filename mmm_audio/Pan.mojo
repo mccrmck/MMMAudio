@@ -49,6 +49,9 @@ def splay[num_simd: Int](*input: MFloat[num_simd], world: World) -> MFloat[2]:
 
     There are multiple versions of splay to handle different input types. It can take a List or InlineArray of SIMD vectors, a VariadicList of SIMD, or a single 1 or many channel SIMD vector. In the case of a list of SIMD vectors, each channel within the vector is treated separately and panned individually.
 
+    Parameters:
+        num_simd: Number of channels in each SIMD input.
+
     Args:
         input: VariadicList of input samples from multiple channels.
         world: Pointer to MMMWorld containing the pan_window.
@@ -86,6 +89,9 @@ def splay[num_simd: Int](input: Span[MFloat[num_simd], ...], world: World) -> MF
     Splay multiple input channels into stereo output.
 
     There are multiple versions of splay to handle different input types. It can take a List or InlineArray of SIMD vectors, a VariadicList of SIMD, or a single 1 or many channel SIMD vector. In the case of a list of SIMD vectors, each channel within the vector is treated separately and panned individually.
+
+    Parameters:
+        num_simd: Number of channels in each SIMD input.
 
     Args:
         input: VariadicList of input samples from multiple channels.
@@ -185,6 +191,100 @@ def pan_az[simd_out_size: Int = 2](sample: Float64, pan: Float64, num_speakers: 
 
 comptime pi_over_2 = pi / 2.0
 
+struct SplayN[num_channels: Int = 2, pan_points: Int = 128](Movable, Copyable):
+    """
+    SplayN - Splays multiple input channels into N output channels. Different from `splay` which only outputs stereo, SplayN can output to any number of channels.
+    
+    Parameters:
+        num_channels: Number of output channels to splay to.
+        pan_points: Number of discrete pan points to use for panning calculations. Default is 128.
+    """
+    var mul_list: InlineArray[MFloat[Self.num_channels], Self.pan_points]
+
+    def __init__(out self):
+        """
+        Initialize the SplayN instance.
+        """
+
+        js = MFloat[self.num_channels](0.0, 1.0)
+        comptime if self.num_channels > 2:
+            for j in range(self.num_channels):
+                js[j] = Float64(j)
+
+        self.mul_list = InlineArray[MFloat[self.num_channels], Self.pan_points](fill=0.0)
+        for i in range(self.pan_points):
+            pan = Float64(i) * Float64(self.num_channels - 1) / Float64(self.pan_points - 1)
+
+            d = abs(pan - js)
+            comptime if self.num_channels > 2:
+                for j in range(self.num_channels):
+                    if d[j] < 1.0:
+                        d[j] = d[j]
+                    else:
+                        d[j] = 1.0
+            
+            for j in range(self.num_channels):
+                self.mul_list[i][j] = cos(d[j] * pi_over_2)
+
+    @always_inline
+    def next[num_simd: Int](mut self, input: Span[MFloat[num_simd], ...]) -> MFloat[self.num_channels]:
+        """Evenly distributes multiple input channels to num_channels of output channels.
+
+        Parameters:
+            num_simd: Number of channels in each SIMD input.
+
+        Args:
+            input: List of input samples from multiple channels.
+
+        Returns:
+            MFloat[self.num_channels]: The panned output sample for each output channel.
+        """
+        out = MFloat[self.num_channels](0.0)
+
+        in_len = len(input) * num_simd
+        if in_len == 0:
+            return out
+        elif in_len == 1:
+            out = input[0][0] * self.mul_list[0]
+            return out
+        for i in range(in_len):
+            index0 = i // num_simd
+            index1 = i % num_simd
+
+            out += input[index0][index1] * self.mul_list[Int(Float64(i) / Float64(in_len - 1) * Float64(self.pan_points - 1))]
+            
+        return out
+
+    @always_inline
+    def next[num_simd: Int](mut self, *input: MFloat[num_simd]) -> MFloat[self.num_channels]:
+        """Evenly distributes multiple input channels to num_channels of output channels.
+
+        Parameters:
+            num_simd: Number of channels in each SIMD input.
+
+        Args:
+            input: Input samples from multiple channels.
+
+        Returns:
+            MFloat[self.num_channels]: The panned output sample for each output channel.
+        """
+        out = MFloat[self.num_channels](0.0)
+
+        in_len = len(input) * num_simd
+        if in_len == 0:
+            return out
+        elif in_len == 1:
+            out = input[0][0] * self.mul_list[0]
+            return out
+        for i in range(in_len):
+            index0 = i // num_simd
+            index1 = i % num_simd
+
+            out += input[index0][index1] * self.mul_list[Int(Float64(i) / Float64(in_len - 1) * Float64(self.pan_points - 1))]
+            
+        return out
+
+
 @always_inline
 def pan_az[num_speakers: Int = 2, simd_out_size: Int = 2, width: Float64 = 2.0, orientation: Float64 = 0.5](sample: Float64, pan: Float64) -> MFloat[simd_out_size]:
     """
@@ -231,96 +331,7 @@ def pan_az[num_speakers: Int = 2, simd_out_size: Int = 2, width: Float64 = 2.0, 
 
     return out
 
-struct SplayN[num_channels: Int = 2, pan_points: Int = 128](Movable, Copyable):
-    """
-    SplayN - Splays multiple input channels into N output channels. Different from `splay` which only outputs stereo, SplayN can output to any number of channels.
-    
-    Parameters:
-        num_channels: Number of output channels to splay to.
-        pan_points: Number of discrete pan points to use for panning calculations. Default is 128.
-    """
-    var mul_list: InlineArray[MFloat[Self.num_channels], Self.pan_points]
-
-    def __init__(out self):
-        """
-        Initialize the SplayN instance.
-        """
-
-        js = MFloat[self.num_channels](0.0, 1.0)
-        comptime if self.num_channels > 2:
-            for j in range(self.num_channels):
-                js[j] = Float64(j)
-
-        self.mul_list = InlineArray[MFloat[self.num_channels], Self.pan_points](fill=0.0)
-        for i in range(self.pan_points):
-            pan = Float64(i) * Float64(self.num_channels - 1) / Float64(self.pan_points - 1)
-
-            d = abs(pan - js)
-            comptime if self.num_channels > 2:
-                for j in range(self.num_channels):
-                    if d[j] < 1.0:
-                        d[j] = d[j]
-                    else:
-                        d[j] = 1.0
-            
-            for j in range(self.num_channels):
-                self.mul_list[i][j] = cos(d[j] * pi_over_2)
-
-    @always_inline
-    def next[num_simd: Int](mut self, input: Span[MFloat[num_simd], ...]) -> MFloat[self.num_channels]:
-        """Evenly distributes multiple input channels to num_channels of output channels.
-
-        Args:
-            input: List of input samples from multiple channels.
-
-        Returns:
-            MFloat[self.num_channels]: The panned output sample for each output channel.
-        """
-        out = MFloat[self.num_channels](0.0)
-
-        in_len = len(input) * num_simd
-        if in_len == 0:
-            return out
-        elif in_len == 1:
-            out = input[0][0] * self.mul_list[0]
-            return out
-        for i in range(in_len):
-            index0 = i // num_simd
-            index1 = i % num_simd
-
-            out += input[index0][index1] * self.mul_list[Int(Float64(i) / Float64(in_len - 1) * Float64(self.pan_points - 1))]
-            
-        return out
-
-    @always_inline
-    def next[num_simd: Int](mut self, *input: MFloat[num_simd]) -> MFloat[self.num_channels]:
-        """Evenly distributes multiple input channels to num_channels of output channels.
-
-        Args:
-            input: Input samples from multiple channels.
-
-        Returns:
-            MFloat[self.num_channels]: The panned output sample for each output channel.
-        """
-        out = MFloat[self.num_channels](0.0)
-
-        in_len = len(input) * num_simd
-        if in_len == 0:
-            return out
-        elif in_len == 1:
-            out = input[0][0] * self.mul_list[0]
-            return out
-        for i in range(in_len):
-            index0 = i // num_simd
-            index1 = i % num_simd
-
-            out += input[index0][index1] * self.mul_list[Int(Float64(i) / Float64(in_len - 1) * Float64(self.pan_points - 1))]
-            
-        return out
-
-
 # XBAP Algorithms
-
 
 @always_inline
 def dbap2D[

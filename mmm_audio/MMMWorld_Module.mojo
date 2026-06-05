@@ -253,5 +253,13 @@ struct TimesOversampling(Equatable, ImplicitlyCopyable):
 
     @staticmethod
     def get_freq_mul(world: World, ov_samp: TimesOversampling) -> Float64:
-        """Get the frequency multiplier for a given oversampling setting."""
+        """Get the frequency multiplier for a given oversampling setting.
+        
+        Args:
+            world: A pointer to the MMMWorld instance, used to access the sample rate.
+            ov_samp: A TimesOversampling struct to use for computing the frequency multiplier.
+        
+        Returns:
+            The frequency multiplier corresponding to the oversampling setting.
+        """
         return (1.0 /  world[].sample_rate) / Float64(ov_samp.times)
