@@ -412,11 +412,12 @@ struct ASREnv(Movable, Copyable):
 
         return ramp * sustain
 
-struct Compressor[num_chans: Int](Movable, Copyable):
+struct Compressor[num_chans: Int, ov_samp: TimesOversampling = TimesOversampling.none](Movable, Copyable):
     """Compressor from Nathan Ho's [Negative Compression web post](https://nathan.ho.name/posts/negative-compression/).
     
     Params:
         num_chans: Number of channels of input/output.
+        ov_samp: Oversampling factor for the compressor.
     """
 
     var amp: Amplitude[Self.num_chans]
@@ -426,6 +427,9 @@ struct Compressor[num_chans: Int](Movable, Copyable):
     var changed: Changed[MFloat[1]]
     var changed2: Changed[MFloat[1]]
 
+    var upsampler: Upsampler[Self.num_chans, Self.ov_samp]
+    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+
     def __init__(out self, world: World):
         """Initialize the Compressor struct.
 
@@ -433,7 +437,10 @@ struct Compressor[num_chans: Int](Movable, Copyable):
             world: Pointer to the MMMWorld.
         """
         self.amp = Amplitude[Self.num_chans](world)
+        
         self.lag = LagUD[1](world)
+        self.lag.sample_rate = world[].sample_rate * Float64(Self.ov_samp.times)
+
         self.denom = sqrt(Float64(Self.num_chans))
         self.sidechain = 1.0
 
@@ -442,6 +449,9 @@ struct Compressor[num_chans: Int](Movable, Copyable):
 
         self.lag.set_lag_times(0.01, 0.1)
         self.amp.set_params(0.001, 0.01)
+
+        self.upsampler = Upsampler[Self.num_chans, Self.ov_samp](world)
+        self.oversampling = Oversampling[Self.num_chans, Self.ov_samp](world)
     
     def next(mut self, input: MFloat[Self.num_chans], threshold: MFloat[1] = -20.0, ratio: MFloat[1] = 4.0, attack: MFloat[1] = 0.01, release: MFloat[1] = 0.1, knee_width: MFloat[1] = 0.0) -> MFloat[Self.num_chans]:
         """Returns the compressed signal, which is the original signal multiplied by the negative compression gain.
@@ -458,7 +468,16 @@ struct Compressor[num_chans: Int](Movable, Copyable):
             MFloat[Self.num_chans] compressed audio signal, which is the original signal multiplied by the negative compression gain.
         """
 
-        return self.next_neg_comp(input, threshold, ratio, attack, release, knee_width) * input
+        comptime if Self.ov_samp == TimesOversampling.none:
+            gain = self.next_neg_comp(input, threshold, ratio, attack, release, knee_width)
+            return input * gain
+        else:
+            comptime for i in range(Self.ov_samp.times):
+                # upsample the input
+                x2 = self.upsampler.next(input, i)
+                y = self.next_neg_comp(x2, threshold, ratio, attack, release, knee_width) * x2
+                self.oversampling.add_sample(y)
+            return self.oversampling.get_sample()
 
     def next_neg_comp(mut self, input: MFloat[Self.num_chans], threshold: MFloat[1] = -20.0, ratio: MFloat[1] = 4.0, attack: MFloat[1] = 0.01, release: MFloat[1] = 0.1, knee_width: MFloat[1] = 0.0) -> MFloat[1]:
         """Returns the negative compression gain (in amplitude units, not dB) for the input signal, which can be multiplied with the original signal or used as a sidechain.
