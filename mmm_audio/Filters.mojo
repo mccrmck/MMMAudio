@@ -11,7 +11,7 @@ struct Lag[num_chans: Int = 1](Movable, Copyable):
     """
 
     comptime simd_width = simd_width_of[DType.float64]()
-    var world: World
+    var sample_rate: Float64
     var lagged: MFloat[Self.num_chans]
     var b1: MFloat[Self.num_chans]
     var lag_time: MFloat[Self.num_chans]
@@ -25,7 +25,7 @@ struct Lag[num_chans: Int = 1](Movable, Copyable):
             lag_time: SIMD vector specifying lag time in seconds for each channel.
         """
         
-        self.world = world
+        self.sample_rate = world[].sample_rate
         self.lagged = MFloat[Self.num_chans](0.0)
         self.b1 = 0
         self.lag_time = 0
@@ -70,7 +70,8 @@ struct Lag[num_chans: Int = 1](Movable, Copyable):
             lag: SIMD vector specifying new lag time in seconds for each channel.
         """
         self.lag_time = lag
-        self.b1 = exp(-6.907755278982137 / (lag * self.world[].sample_rate))
+        self.b1 = exp(-6.907755278982137 / (lag * self.sample_rate))
+
     
 struct Lags[num_lags: Int](Movable, Copyable):
     """A convenience struct for processing a list of lags (which are processed in parallel using SIMD). The number of lags is determined at compile time by the num_lags parameter. The outputs of the lags can be accessed using the [] operator, just like accessing values in a List: `lags[0]`.
@@ -117,7 +118,7 @@ struct LagUD[num_chans: Int = 1](Movable, Copyable):
         num_chans: Number of SIMD channels to process in parallel.
     """
 
-    var world: World
+    var sample_rate: Float64
     var lagged: MFloat[Self.num_chans]
     var b1_up: MFloat[Self.num_chans]
     var b1_down: MFloat[Self.num_chans]
@@ -138,7 +139,7 @@ struct LagUD[num_chans: Int = 1](Movable, Copyable):
             lag_up: SIMD vector specifying lag time in seconds for rising values.
             lag_down: SIMD vector specifying lag time in seconds for falling values.
         """
-        self.world = world
+        self.sample_rate = world[].sample_rate
         self.lagged = MFloat[Self.num_chans](0.0)
         self.b1_up = 0
         self.b1_down = 0
@@ -196,15 +197,15 @@ struct LagUD[num_chans: Int = 1](Movable, Copyable):
         """
         self.lag_up = lag_up
         self.lag_down = lag_down
-        self.b1_up = exp(-6.907755278982137 / (lag_up * self.world[].sample_rate))
-        self.b1_down = exp(-6.907755278982137 / (lag_down * self.world[].sample_rate))
+        self.b1_up = exp(-6.907755278982137 / (lag_up * self.sample_rate))
+        self.b1_down = exp(-6.907755278982137 / (lag_down * self.sample_rate))
 
-@doc_hidden
-struct SVFModes:
+@fieldwise_init
+struct FilterType(Equatable, ImplicitlyCopyable):
     """Enumeration of different State Variable Filter modes.
 
     This makes specifying a filter type more readable. For example,
-    to specify a lowpass filter, use `SVFModes.lowpass`.
+    to specify a lowpass filter, use `FilterType.lowpass`.
 
     | Mode          | Value |
     |---------------|-------|
@@ -218,15 +219,26 @@ struct SVFModes:
     | lowshelf      | 7     |
     | highshelf     | 8     |
     """
-    comptime lowpass: Int64 = 0
-    comptime bandpass: Int64 = 1
-    comptime highpass: Int64 = 2
-    comptime notch: Int64 = 3
-    comptime peak: Int64 = 4
-    comptime bell: Int64 = 5
-    comptime allpass: Int64 = 6
-    comptime lowshelf: Int64 = 7
-    comptime highshelf: Int64 = 8
+
+    var _value: Int
+
+    comptime lowpass = FilterType(0)
+    comptime bandpass = FilterType(1)
+    comptime highpass = FilterType(2)
+    comptime notch = FilterType(3)
+    comptime peak = FilterType(4)
+    comptime bell = FilterType(5)
+    comptime allpass = FilterType(6)
+    comptime lowshelf = FilterType(7)
+    comptime highshelf = FilterType(8)
+
+    @doc_hidden
+    def __eq__(self, other: Self) -> Bool:
+        return self._value == other._value
+
+    @doc_hidden
+    def __ne__(self, other: Self) -> Bool:
+        return not (self == other)
 
 struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
     """A State Variable Filter struct.
@@ -261,7 +273,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
 
     @doc_hidden
     @always_inline
-    def _compute_coefficients[filter_type: Int64](self, frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> Tuple[MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans]]:
+    def _compute_coefficients[filter_type: FilterType](self, frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> Tuple[MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans]]:
         """Compute filter coefficients based on type and parameters.
         
         Parameters:
@@ -282,16 +294,16 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         # Compute g (frequency warping)
         var base_g = tan(frequency * pi / self.sample_rate)
         var g: MFloat[Self.num_chans]
-        comptime if filter_type == 7:  # lowshelf
+        comptime if filter_type == FilterType.lowshelf:  # lowshelf
             g = base_g / sqrt(A)
-        elif filter_type == 8:  # highshelf
+        elif filter_type == FilterType.highshelf:  # highshelf
             g = base_g * sqrt(A)
         else:
             g = base_g
         
         # Compute k (resonance factor)
         var k: MFloat[Self.num_chans]
-        comptime if filter_type == 6:  # bell
+        comptime if filter_type == FilterType.bell:  # bell
             k = 1.0 / (q * A)
         else:
             k = 1.0 / q
@@ -303,7 +315,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
 
     @doc_hidden
     @always_inline
-    def _get_mix_coefficients[filter_type: Int64](self, k: MFloat[Self.num_chans], A: MFloat[Self.num_chans]) -> Tuple[MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans]]:
+    def _get_mix_coefficients[filter_type: FilterType](self, k: MFloat[Self.num_chans], A: MFloat[Self.num_chans]) -> Tuple[MFloat[Self.num_chans], MFloat[Self.num_chans], MFloat[Self.num_chans]]:
         """Get mixing coefficients for different filter types"""
         
         mc0 = MFloat[Self.num_chans](1.0)
@@ -311,23 +323,23 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         mc2 = MFloat[Self.num_chans](0.0)
 
         comptime for i in range(Self.num_chans):
-            comptime if filter_type == SVFModes.lowpass:    
+            comptime if filter_type == FilterType.lowpass:    
                 mc0[i], mc1[i], mc2[i] = 0.0, 0.0, 1.0
-            elif filter_type == SVFModes.bandpass:  
+            elif filter_type == FilterType.bandpass:  
                 mc0[i], mc1[i], mc2[i] = 0.0, 1.0, 0.0
-            elif filter_type == SVFModes.highpass:   
+            elif filter_type == FilterType.highpass:   
                 mc0[i], mc1[i], mc2[i] = 1.0, -k[i], -1.0
-            elif filter_type == SVFModes.peak:   
+            elif filter_type == FilterType.peak:   
                 mc0[i], mc1[i], mc2[i] = 1.0, -k[i], -2.0
-            elif filter_type == SVFModes.notch:   
+            elif filter_type == FilterType.notch:   
                 mc0[i], mc1[i], mc2[i] = 1.0, -k[i], 0.0
-            elif filter_type == SVFModes.allpass:   
+            elif filter_type == FilterType.allpass:   
                 mc0[i], mc1[i], mc2[i] = 1.0, -2.0*k[i], 0.0
-            elif filter_type == SVFModes.bell:  
+            elif filter_type == FilterType.bell:  
                 mc0[i], mc1[i], mc2[i] = 1.0, k[i]*(A[i]*A[i] - 1.0), 0.0
-            elif filter_type == SVFModes.lowshelf:   
+            elif filter_type == FilterType.lowshelf:   
                 mc0[i], mc1[i], mc2[i] = 1.0, k[i]*(A[i] - 1.0), A[i]*A[i] - 1.0
-            elif filter_type == SVFModes.highshelf:    
+            elif filter_type == FilterType.highshelf:    
                 mc0[i], mc1[i], mc2[i] = A[i]*A[i], k[i]*(1.0 - A[i])*A[i], 1.0 - A[i]*A[i]
             else:
                 mc0[i], mc1[i], mc2[i] = 1.0, 0.0, 0.0  
@@ -336,11 +348,11 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
 
     @doc_hidden
     @always_inline
-    def next[filter_type: Int64](mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans] = 0.0) -> MFloat[Self.num_chans]:
+    def next[filter_type: FilterType](mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans] = 0.0) -> MFloat[Self.num_chans]:
         """Process one sample through the SVF filter of the given type.
         
         Parameters:
-            filter_type: The type of SVF filter to apply. See `SVFModes` struct for options.
+            filter_type: The type of SVF filter to apply. See `FilterType` struct for options.
 
         Args:
             input: The next input value to process.
@@ -388,7 +400,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.lowpass](input, frequency, q)
+        return self.next[FilterType.lowpass](input, frequency, q)
 
     @always_inline
     def bpf(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -403,7 +415,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.bandpass](input, frequency, q)
+        return self.next[FilterType.bandpass](input, frequency, q)
 
     @always_inline
     def hpf(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -418,7 +430,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.highpass](input, frequency, q)
+        return self.next[FilterType.highpass](input, frequency, q)
 
     @always_inline
     def peak(mut self, input: MFloat[self.num_chans], frequency: MFloat[self.num_chans], q: MFloat[self.num_chans]) -> MFloat[self.num_chans]:
@@ -433,7 +445,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.peak](input, frequency, q)
+        return self.next[FilterType.peak](input, frequency, q)
 
     @always_inline
     def notch(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -448,7 +460,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.notch](input, frequency, q)
+        return self.next[FilterType.notch](input, frequency, q)
 
     @always_inline
     def allpass(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -463,7 +475,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.allpass](input, frequency, q)
+        return self.next[FilterType.allpass](input, frequency, q)
 
     @always_inline
     def bell(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -479,7 +491,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.bell](input, frequency, q, gain_db)
+        return self.next[FilterType.bell](input, frequency, q, gain_db)
 
     @always_inline
     def lowshelf(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -495,7 +507,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.lowshelf](input, frequency, q, gain_db)
+        return self.next[FilterType.lowshelf](input, frequency, q, gain_db)
 
     @always_inline
     def highshelf(mut self, input: MFloat[Self.num_chans], frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> MFloat[Self.num_chans]:
@@ -511,7 +523,7 @@ struct SVF[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[SVFModes.highshelf](input, frequency, q, gain_db)
+        return self.next[FilterType.highshelf](input, frequency, q, gain_db)
 
 struct lpf_LR4[num_chans: Int = 1](Movable, Copyable):
     """A 4th-order [Linkwitz-Riley](https://en.wikipedia.org/wiki/Linkwitz%E2%80%93Riley_filter) lowpass filter.
@@ -1152,33 +1164,6 @@ def tf2s[num_chans: Int = 1](b2: MFloat[num_chans], b1: MFloat[num_chans], b0: M
 
     return (b0d, b1d, b2d, a1d, a2d)
 
-@doc_hidden
-struct BiquadModes:
-    """Enumeration of different Biquad Filter modes.
-
-    This makes specifying a filter type more readable. For example,
-    to specify a lowpass filter, use `BiquadModes.lowpass`.
-
-    | Mode          | Value |
-    |---------------|-------|
-    | lowpass       | 0     |
-    | bandpass      | 1     |
-    | highpass      | 2     |
-    | notch         | 3     |
-    | bell          | 4     |
-    | allpass       | 5     |
-    | lowshelf      | 6     |
-    | highshelf     | 7     |
-    """
-    comptime lowpass: Int64 = 0
-    comptime bandpass: Int64 = 1
-    comptime highpass: Int64 = 2
-    comptime notch: Int64 = 3
-    comptime bell: Int64 = 4
-    comptime allpass: Int64 = 5
-    comptime lowshelf: Int64 = 6
-    comptime highshelf: Int64 = 7
-
 struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
     """A Biquad filter struct.
 
@@ -1213,7 +1198,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
 
     @doc_hidden
     @always_inline
-    def _compute_coefficients[filter_type: Int64](self, frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> Tuple[
+    def _compute_coefficients[filter_type: FilterType](self, frequency: MFloat[Self.num_chans], q: MFloat[Self.num_chans], gain_db: MFloat[Self.num_chans]) -> Tuple[
         MFloat[Self.num_chans], #b0
         MFloat[Self.num_chans], #b1
         MFloat[Self.num_chans], #b2
@@ -1253,49 +1238,49 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         var a1 = MFloat[Self.num_chans](0.0)
         var a2 = MFloat[Self.num_chans](0.0)
 
-        comptime if filter_type == BiquadModes.lowpass:
+        comptime if filter_type == FilterType.lowpass:
             b1 = (1.0 - cosw0) # doing this first saves some calculations
             b0 = b1 * 0.5
             b2 = b0
             a0 = 1 + alpha
             a1 = -2.0 * cosw0
             a2 = 1 - alpha
-        elif filter_type == BiquadModes.highpass:
+        elif filter_type == FilterType.highpass:
             b0 = (1.0 + cosw0) * 0.5
             b1 = -(1.0 + cosw0)
             b2 = b0
             a0 = 1 + alpha
             a1 = -2.0 * cosw0
             a2 = 1 - alpha
-        elif filter_type == BiquadModes.bandpass:
+        elif filter_type == FilterType.bandpass:
             b0 = alpha
             b1 = 0.0
             b2 = -alpha
             a0 = 1 + alpha
             a1 = -2.0 * cosw0
             a2 = 1 - alpha
-        elif filter_type == BiquadModes.notch:
+        elif filter_type == FilterType.notch:
             b0 = 1.0
             b1 = -2.0 * cosw0
             b2 = 1.0
             a0 = 1.0 + alpha
             a1 = b1
             a2 = 1 - alpha
-        elif filter_type == BiquadModes.allpass:
+        elif filter_type == FilterType.allpass:
             b0 = 1.0 - alpha
             b1 = -2.0 * cosw0
             b2 = 1.0 + alpha
             a0 = b2
             a1 = b1
             a2 = b0
-        elif filter_type == BiquadModes.bell:
+        elif filter_type == FilterType.bell or filter_type == FilterType.peak:
             b0 = 1.0 + (alpha * A)
             b1 = -2.0 * cosw0
             b2 = 1.0 - (alpha * A)
             a0 = 1.0 + (alpha / A)
             a1 = -2.0 * cosw0
             a2 = 1.0 - (alpha / A)
-        elif filter_type == BiquadModes.lowshelf:
+        elif filter_type == FilterType.lowshelf:
             var Ap1 = A + 1.0
             var Am1 = A - 1.0
             var twoSqrtA = 2.0 * sqrt(A) * alpha
@@ -1306,7 +1291,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
             a0 =  (Ap1 + Am1 * cosw0 + twoSqrtA)
             a1 =  -2.0 * (Am1 + Ap1 * cosw0)
             a2 =  (Ap1 + Am1 * cosw0 - twoSqrtA)
-        elif filter_type == BiquadModes.highshelf:
+        elif filter_type == FilterType.highshelf:
             var Ap1 = A + 1.0
             var Am1 = A - 1.0
             var twoSqrtA = 2.0 * sqrt(A) * alpha
@@ -1329,7 +1314,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
 
     @doc_hidden
     @always_inline
-    def next[filter_type: Int64](
+    def next[filter_type: FilterType](
         mut self,
         input: MFloat[Self.num_chans],
         frequency: MFloat[Self.num_chans],
@@ -1339,7 +1324,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         """Process one sample through the biquad filter of the given type.
 
         Parameters:
-            filter_type: The type of biquad filter to process through. See `BiquadModes` struct for options.
+            filter_type: The type of biquad filter to process through. See `FilterType` struct for options.
 
         Args:
             input: The next input value to process.
@@ -1382,7 +1367,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.lowpass](input, frequency, q)
+        return self.next[FilterType.lowpass](input, frequency, q)
 
     @always_inline
     def hpf(
@@ -1402,7 +1387,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.highpass](input, frequency, q)
+        return self.next[FilterType.highpass](input, frequency, q)
 
     @always_inline
     def bpf(
@@ -1422,7 +1407,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.bandpass](input, frequency, q)
+        return self.next[FilterType.bandpass](input, frequency, q)
 
     @always_inline
     def notch(
@@ -1442,7 +1427,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.notch](input, frequency, q)
+        return self.next[FilterType.notch](input, frequency, q)
 
     @always_inline
     def allpass(
@@ -1462,7 +1447,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.allpass](input, frequency, q)
+        return self.next[FilterType.allpass](input, frequency, q)
 
     @always_inline
     def bell(
@@ -1484,7 +1469,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.bell](input, frequency, q, gain_db)
+        return self.next[FilterType.bell](input, frequency, q, gain_db)
 
     @always_inline
     def lowshelf(
@@ -1506,7 +1491,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.lowshelf](input, frequency, q, gain_db)
+        return self.next[FilterType.lowshelf](input, frequency, q, gain_db)
 
     @always_inline
     def highshelf(
@@ -1528,7 +1513,7 @@ struct Biquad[num_chans: Int = 1](Movable, Copyable, PolyReset):
         Returns:
             The next sample of the filtered output.
         """
-        return self.next[BiquadModes.highshelf](input, frequency, q, gain_db)
+        return self.next[FilterType.highshelf](input, frequency, q, gain_db)
 
 struct MedianFilter(Movable, Copyable, PolyReset):
     """A simple median filter for scalar samples.

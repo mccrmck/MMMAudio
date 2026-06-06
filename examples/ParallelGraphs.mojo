@@ -21,7 +21,7 @@ struct ParallelGraphs(Movable, Copyable):
         self.messenger.update("pan", self.pan) 
 
         osc = self.osc.next[OscType.saw](self.freq)
-        osc = self.filt.next[SVFModes.lowpass](osc, 2000.0, 1.0)
+        osc = self.filt.next[FilterType.lowpass](osc, 2000.0, 1.0)
         osc2 = pan2(osc, self.pan)
 
         return osc2 * 0.3
