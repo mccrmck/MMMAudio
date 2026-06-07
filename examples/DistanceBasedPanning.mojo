@@ -22,9 +22,9 @@ struct DistanceBasedPanning(Movable, Copyable):
         
         comptime max_simd = 8
 
-        # self.messenger.update("pos", self.pos)
-        self.pos[0] = linlin(self.world[].mouse_x, 0.0, 1.0, -1.0, 1.0)
-        self.pos[1] = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, -1.0)
+        self.messenger.update("pos", self.pos)
+        # self.pos[0] = linlin(self.world[].mouse_x, 0.0, 1.0, -1.0, 1.0)
+        # self.pos[1] = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, -1.0)
         
         # 4 speaker setup
        
@@ -43,6 +43,7 @@ struct DistanceBasedPanning(Movable, Copyable):
 
         out = dbap2D[4, max_simd, speakers, weights](sig, self.pos, 0.1)
         
+        self.world[].print(self.pos)
 
         #7 speaker setup
 
