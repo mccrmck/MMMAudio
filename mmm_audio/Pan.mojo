@@ -439,10 +439,110 @@ def dbap2D[
 
     return out
 
+# There are multiple versions of vbap2D for using x/y coordinates or azimuth in radians
+@always_inline
+
+
+@always_inline
+def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[Float64, num_speakers]](sample: Float64, az: Float64) -> MFloat[simd_out_size]:
+    """
+    An implementation of VBAP (Vector Base Amplitude Panning).
+
+    Parameters:
+        num_speakers: The number of speakers as an integer.
+        simd_out_size: Must be a power of 2 and greater than num_speakers.
+        speaker_positions: The speaker positions as an InlineArray of Float64 azimuth angles in radians.
+    
+    Args:
+        sample: The mono signal to be panned.
+        az: The angle of the source in radians.
+    """
+    
+
+    def calc_speaker_unit_vectors() -> InlineArray[MFloat[2], num_speakers]:
+        var speaker_vectors = InlineArray[MFloat[2], num_speakers](fill=MFloat[2](0.0,0.0))
+        
+        for i in range(num_speakers):
+            speaker_vectors[i] = MFloat[2](cos(speaker_positions[i]), sin(speaker_positions[i]))
+
+        return speaker_vectors
+
+    def calc_inverse_base[speaker_pairs:InlineArray[MInt[2], num_speakers], speaker_vectors: InlineArray[MFloat[2], num_speakers]]() -> InlineArray[InlineArray[MFloat[2], 2], num_speakers]:
+        var inverse_bases = InlineArray[InlineArray[MFloat[2], 2], num_speakers](fill=InlineArray[MFloat[2], 2](fill=0.0))
+
+        for i in range(num_speakers):
+            var speaker_a = speaker_vectors[speaker_pairs[i][0]]
+            var speaker_b = speaker_vectors[speaker_pairs[i][1]]
+            determinate = (speaker_a[0] * speaker_b[1] - speaker_a[1] * speaker_b[0])
+
+            var inverted_a = MFloat[2](speaker_b[1], -1 * speaker_a[1])
+            var inverted_b = MFloat[2](-1 * speaker_b[0], speaker_a[1])
+            inverse_bases[i][0] = inverted_a
+            inverse_bases[i][1] = inverted_b
+
+
+        return inverse_bases
+
+    def calc_speaker_pairs[speaker_unit_vectors:InlineArray[MFloat[2], num_speakers]]() -> InlineArray[MInt[2], num_speakers]:
+        var speaker_pairs = InlineArray[MInt[2], num_speakers](fill=MInt[2](0, 0))
+        
+        return speaker_pairs
+    
+    comptime speaker_unit_vectors = calc_speaker_unit_vectors()
+    comptime speaker_pairs = calc_speaker_pairs[speaker_unit_vectors]()
+    comptime speaker_inverse_bases = calc_inverse_base[speaker_pairs, speaker_unit_vectors]()
+    # From Ville Pulkki's paper here's the steps at runtime
+
+    # New direction vectors p(1, ..., n) are defined.
+    var source_vector = MFloat[2](cos(az), sin(az))
+
+
+    # The right pairs are selected.
+    var active_speaker_pair = MInt[2](0, 1)
+    var active_gain_factors = MFloat[2](0.0)
+
+    comptime for speaker_pair in speaker_pairs:
+        var speaker_a_vector = speaker_inverse_bases[speaker_pair[0]][0]
+        var speaker_b_vector = speaker_inverse_bases[speaker_pair[1]][1]
+
+        var speaker_a_product = source_vector[0] * speaker_a_vector
+        var speaker_b_product = source_vector[1] * speaker_b_vector
+
+        var speaker_a_gain_factor = speaker_a_product[0] + speaker_b_product[0]
+        var speaker_b_gain_factor = speaker_a_product[1] + speaker_b_product[1]
+
+        if speaker_a_gain_factor > 0 and speaker_b_gain_factor > 0:
+            active_speaker_pair = speaker_pair
+            active_gain_factors = MFloat[2](speaker_a_gain_factor, speaker_b_gain_factor)
+            break
+
+
+    # The new gain factors are calculated.
+    var gain_factors = MFloat[simd_out_size](0.0)
+    
+    gain_factors[Int(active_speaker_pair[0])] = active_gain_factors[0]
+    gain_factors[Int(active_speaker_pair[1])] = active_gain_factors[1]
+
+    # for i in range(num_speakers):
+    #     gain_factors[i] = 0
+    # The old gain factors are cross faded to new ones and the loudspeaker bases are changed if necessary.
+
+    # gain factors of g_1 and g_2 for speaker pairs. g_1^2 + g_2^2 = C where C is the constant value of the perceived loudness. C should always be the same no matter the panning position.
+
+    # The speakers are represented as unit length vectors l_1 and l_2  (to l_n) and the source unit vector p = g_1 * l_1 + g_2 * l_2 (in 2D MFloat[2] is going to be helpful!)
+
+    return MFloat[simd_out_size](sample)
+
 
 def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[MFloat[2], num_speakers]](sample: Float64, pos: MFloat[2]) -> MFloat[simd_out_size]:
     """
     An implementation of VBAP (Vector Base Amplitude Panning).
+
+    Parameters:
+        num_speakers: The number of speakers as an integer.
+        simd_out_size: Must be a power of 2 and greater than num_speakers.
+        speaker_positions: The speaker positions as an InlineArray of MFloat[2] x/y pairs in meters from a center position.
     """
 
     return MFloat[simd_out_size](sample)
+
