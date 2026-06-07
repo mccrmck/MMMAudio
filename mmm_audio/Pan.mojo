@@ -440,7 +440,7 @@ def dbap2D[
     return out
 
 # There are multiple versions of vbap2D for using x/y coordinates or azimuth in radians
-@always_inline
+
 
 
 @always_inline
@@ -467,7 +467,7 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
 
         return speaker_vectors
 
-    def calc_inverse_base[speaker_pairs:InlineArray[MInt[2], num_speakers], speaker_vectors: InlineArray[MFloat[2], num_speakers]]() -> InlineArray[InlineArray[MFloat[2], 2], num_speakers]:
+    def calc_inverse_base[speaker_pairs:InlineArray[InlineArray[Int, 2], num_speakers], speaker_vectors: InlineArray[MFloat[2], num_speakers]]() -> InlineArray[InlineArray[MFloat[2], 2], num_speakers]:
         var inverse_bases = InlineArray[InlineArray[MFloat[2], 2], num_speakers](fill=InlineArray[MFloat[2], 2](fill=0.0))
 
         for i in range(num_speakers):
@@ -477,31 +477,34 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
 
             var inverted_a = MFloat[2](speaker_b[1], -1 * speaker_a[1])
             var inverted_b = MFloat[2](-1 * speaker_b[0], speaker_a[1])
-            inverse_bases[i][0] = inverted_a
-            inverse_bases[i][1] = inverted_b
+            inverse_bases[i][0] = inverted_a/determinate
+            inverse_bases[i][1] = inverted_b/determinate
 
 
         return inverse_bases
 
-    def calc_speaker_pairs[speaker_unit_vectors:InlineArray[MFloat[2], num_speakers]]() -> InlineArray[MInt[2], num_speakers]:
-        var speaker_pairs = InlineArray[MInt[2], num_speakers](fill=MInt[2](0, 0))
+    def calc_speaker_pairs[]() -> InlineArray[InlineArray[Int, 2], num_speakers]:
+        var speaker_pairs = InlineArray[InlineArray[Int, 2], num_speakers](fill=[0, 0])
+        for i in range(num_speakers - 1):
+            speaker_pairs[i] = [i, i+1] #MInt[2](i, i + 1)
         
+        speaker_pairs[num_speakers - 1]  = [num_speakers - 1, 0]#MInt[2](num_speakers, 0)
         return speaker_pairs
     
     comptime speaker_unit_vectors = calc_speaker_unit_vectors()
-    comptime speaker_pairs = calc_speaker_pairs[speaker_unit_vectors]()
+    comptime speaker_pairs = calc_speaker_pairs[]()
     comptime speaker_inverse_bases = calc_inverse_base[speaker_pairs, speaker_unit_vectors]()
     # From Ville Pulkki's paper here's the steps at runtime
 
-    # New direction vectors p(1, ..., n) are defined.
+    # # New direction vectors p(1, ..., n) are defined.
     var source_vector = MFloat[2](cos(az), sin(az))
 
 
-    # The right pairs are selected.
-    var active_speaker_pair = MInt[2](0, 1)
+    # # The right pairs are selected.
+    var active_speaker_pair : InlineArray[Int, 2] = [0, 1]
     var active_gain_factors = MFloat[2](0.0)
-
-    comptime for speaker_pair in speaker_pairs:
+    
+    for speaker_pair in speaker_pairs:
         var speaker_a_vector = speaker_inverse_bases[speaker_pair[0]][0]
         var speaker_b_vector = speaker_inverse_bases[speaker_pair[1]][1]
 
@@ -517,7 +520,7 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
             break
 
 
-    # The new gain factors are calculated.
+    # # The new gain factors are calculated.
     var gain_factors = MFloat[simd_out_size](0.0)
     
     gain_factors[Int(active_speaker_pair[0])] = active_gain_factors[0]
@@ -530,8 +533,9 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     # gain factors of g_1 and g_2 for speaker pairs. g_1^2 + g_2^2 = C where C is the constant value of the perceived loudness. C should always be the same no matter the panning position.
 
     # The speakers are represented as unit length vectors l_1 and l_2  (to l_n) and the source unit vector p = g_1 * l_1 + g_2 * l_2 (in 2D MFloat[2] is going to be helpful!)
-
-    return MFloat[simd_out_size](sample)
+    print(active_speaker_pair)
+    return gain_factors * sample
+    # return MFloat[simd_out_size](sample)
 
 
 def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[MFloat[2], num_speakers]](sample: Float64, pos: MFloat[2]) -> MFloat[simd_out_size]:
