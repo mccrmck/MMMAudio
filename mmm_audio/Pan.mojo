@@ -382,16 +382,22 @@ def dbap2D[
         
         var mean : Float64 = dists.reduce_add() / Float64(comp_num_speakers)
         
-        return pow(dists - mean, 2).reduce_add() / Float64(comp_num_speakers - 1)
+        return pow(dists - mean, 2).reduce_add() / Float64(comp_num_speakers)
         
     
     comptime vec_weights = array_to_mfloat[simd_out_size, weights]()
-    # comptime speaker_position_variance : Float64 = variance_of_dists[num_speakers, speaker_positions]()
+    comptime speaker_position_variance : Float64 = variance_of_dists[num_speakers, speaker_positions]()
     
     # Calculates the blur factor using the speaker variance to normalize
-    # var blur_sq = pow(max(0.00001, blur * speaker_position_variance), 2)
+    var blur_sq : Float64
 
-    var blur_sq = pow(max(0.00001, blur), 2)
+    # comptime if speaker_position_variance == 0:
+    #         blur_sq = pow(max(0.0001, blur), 2)
+    #     else:
+    #         blur_sq = pow(max(0.0001, blur * speaker_position_variance), 2)
+
+    blur_sq = pow(max(0.0001, blur * speaker_position_variance), 2)
+    # var blur_sq = pow(max(0.00001, blur), 2)
 
    # Set dists to 1.0 by default to avoid divide by 0 when calculating k
     var dists = MFloat[simd_out_size](1.0)
@@ -427,6 +433,9 @@ def dbap2D[
         out[i*2+1] = temp[1]
     comptime if num_speakers % 2 != 0:
         out[num_speakers - 1] = k * vec_weights[num_speakers - 1] / pow(dists[num_speakers - 1], a) * sample
+
+
+    # out = MFloat[simd_out_size](blur_sq)
 
     return out
 
