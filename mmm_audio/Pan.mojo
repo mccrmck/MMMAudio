@@ -514,9 +514,6 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     comptime speaker_unit_vectors = calc_speaker_unit_vectors()
     comptime speaker_pairs = calc_speaker_pairs[speaker_positions]()
     comptime speaker_inverse_bases = calc_inverse_base[speaker_pairs, speaker_unit_vectors]()
-    # From Ville Pulkki's paper here's the steps at runtime
-    
-    # # New direction vectors p(1, ..., n) are defined.
     
     
     # # The right pairs are selected.
@@ -581,31 +578,14 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     # if active_speaker_pair != [0, 0]:
     var source_vector = MFloat[2](cos(az), sin(az))
 
-    # Disallow very small values
-    if source_vector[0] < 0.0000001 and source_vector[0] > -0.0000001:
-            source_vector[0] = 0
-
-    if source_vector[1] < 0.0000001 and source_vector[1] > -0.0000001:
-        source_vector[1] = 0
-    
     calc_gain_factors(source_vector, active_speaker_pair, active_gain_factors, az)
-    print(active_gain_factors.reduce_add())
+   
     
     var gain_factors = MFloat[simd_out_size](0.0)
     
     gain_factors[Int(active_speaker_pair[0])] = active_gain_factors[0]
     gain_factors[Int(active_speaker_pair[1])] = active_gain_factors[1]
     
-    # Normalize gain factors
-    
-    # gain_factors = (sqrt((gain_factors * gain_factors).reduce_add()) * gain_factors) / (gain_factors * gain_factors).reduce_add()
-
-    # for i in range(num_speakers):
-    #     gain_factors[i] = 0
-    # The old gain factors are cross faded to new ones and the loudspeaker bases are changed if necessary.
-
-    # gain factors of g_1 and g_2 for speaker pairs. g_1^2 + g_2^2 = C where C is the constant value of the perceived loudness. C should always be the same no matter the panning position.
-
     # The speakers are represented as unit length vectors l_1 and l_2  (to l_n) and the source unit vector p = g_1 * l_1 + g_2 * l_2 (in 2D MFloat[2] is going to be helpful!)
     return gain_factors * sample
     # return MFloat[simd_out_size](sample)
