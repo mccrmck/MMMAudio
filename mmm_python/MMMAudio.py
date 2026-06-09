@@ -125,10 +125,10 @@ class MMMAudio:
             # Identify device type
             print_list = []
             if max_input > 0:
-                print_list.append(f"Input  Device {i}: {name}, Channels: {max_input}, Sample Rate: {device_info.get('defaultSampleRate')} Hz")
+                print_list.append(f"Input  Device {i}: \"{name}\", Channels: {max_input}, Sample Rate: {device_info.get('defaultSampleRate')} Hz")
                 ret_devices[0][i] = [name, max_input, device_info.get('defaultSampleRate')]
             if max_output > 0:
-                print_list.append(f"Output Device {i}: {name}, Channels: {max_output}, Sample Rate: {device_info.get('defaultSampleRate')} Hz")
+                print_list.append(f"Output Device {i}: \"{name}\", Channels: {max_output}, Sample Rate: {device_info.get('defaultSampleRate')} Hz")
                 ret_devices[1][i] = [name, max_output, device_info.get('defaultSampleRate')]
             if print_them:
                 for msg in print_list:
