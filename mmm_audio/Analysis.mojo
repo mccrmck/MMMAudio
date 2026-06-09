@@ -1,6 +1,5 @@
 from mmm_audio import *
-from std.math import ceil, floor, log2, log, exp, sqrt, cos, pi
-from std.math import sqrt
+from std.math import ceil, floor, log2, log, exp, sqrt, cos, pi, inf
 
 @always_inline
 @doc_hidden
@@ -1547,4 +1546,168 @@ struct TopNFreqs(FFTProcessable, GetFloat64Featurable):
 
         sort[cmp_fn](self.freq_amp_pairs)
 
+struct Chroma(FFTProcessable, GetFloat64Featurable):
+    """A struct for computing chroma features.
+    
+    Chroma features are a representation of the spectral content of an audio signal in terms of musical pitch classes.
+    It can indicate how much of each pitch class is present in the audio signal.
 
+    This implementation imitates the Librosa library's [chroma_stft](https://librosa.org/doc/main/generated/librosa.feature.chroma_stft.html).
+    """
+    var sample_rate: Float64
+    var window_size: Int
+    var n_chroma: Int
+    var tuning: Float64
+    var norm: Float64
+    var power: Float64
+    var ctroct: Float64
+    var base_c: Bool
+    var weights: List[List[Float64]]
+    var chroma: List[Float64]
+    var octwidth: Float64
+
+    def get_features(self) -> List[Float64]:
+        return self.chroma.copy()
+
+    def __init__(
+        out self,
+        sample_rate: Float64,
+        window_size: Int,
+        n_chroma: Int = 12,
+        tuning: Float64 = 0.0,
+        norm: Float64 = inf[DType.float64](),
+        power: Float64 = 2.0,
+        ctroct: Float64 = 5.0,
+        octwidth: Float64 = 2.0,
+        base_c: Bool = True,
+    ):
+        """Initialize the Chroma struct.
+
+        Args:
+            sample_rate: The sample rate of the audio signal.
+            window_size: The size of the FFT window.
+            n_chroma: The number of chroma bins (divisions per octave).
+            tuning: The tuning deviation of the reference pitch as a fraction of a division per octave (when `n_chroma` = 12, these are semitones).
+            norm: The normalization to apply to the chroma values. If `inf` the largest absolute chroma becomes 1 and everything is normalized to that. If 1, the sum of the chroma values is 1. If 0, no normalization is applied.
+            power: The power to which to raise the magnitude values before computing the chroma.
+            ctroct: Center of the octave weighting, measured in octaves above A0 = 27.5 Hz. FFT bins near this octave contribute most strongly to the chroma. For example, 4.0 centers the weighting near A4 (440 Hz) and 5.0 near A5 (880 Hz). Lower values emphasize lower-frequency octaves; higher values emphasize higher-frequency octaves.
+            octwidth: Width of the Gaussian octave weighting, in octaves. Smaller values give stronger octave focus; larger values approach flat weighting. 0 disables the octave weighting.
+            base_c: Whether to use C as the base pitch (True) or A as the base pitch (False).
+        """
+        self.sample_rate = sample_rate
+        self.window_size = window_size
+        self.n_chroma = n_chroma
+        self.tuning = tuning
+        self.norm = norm
+        self.power = power
+        self.ctroct = ctroct
+        self.octwidth = octwidth
+        self.base_c = base_c
+
+        var n_bins = (self.window_size // 2) + 1
+        self.weights = List[List[Float64]](length=self.n_chroma, fill=List[Float64](length=n_bins, fill=0.0))
+        self.chroma = List[Float64](length=self.n_chroma, fill=0.0)
+        self.make_weights()
+
+    def from_mags(mut self, mags: List[Float64]):
+        """Compute the chroma features from the magnitude values.
+
+        Nothing is returned. The chroma values are updated internally and can be accessed via `.chroma`.
+
+        Args:
+            mags: The magnitude values of the current FFT frame.
+        """
+        # TODO: only power the mags once, not for every chroma
+        for i in range(self.n_chroma):
+            var acc: Float64 = 0.0
+            for j in range(len(mags)):
+                var mag = mags[j]
+                if self.power == 2.0:
+                    mag = mag * mag
+                elif self.power != 1.0:
+                    mag = mag ** self.power
+                acc += self.weights[i][j] * mag
+            self.chroma[i] = acc
+
+        if self.norm <= 0.0:
+            return
+
+        var scale: Float64 = 0.0
+        if self.norm == inf[DType.float64]():
+            for i in range(self.n_chroma):
+                scale = max(scale, abs(self.chroma[i]))
+        elif self.norm == 1.0:
+            for i in range(self.n_chroma):
+                scale += abs(self.chroma[i])
+        elif self.norm == 2.0:
+            for i in range(self.n_chroma):
+                scale += self.chroma[i] * self.chroma[i]
+            scale = sqrt(scale)
+        else:
+            for i in range(self.n_chroma):
+                scale += abs(self.chroma[i]) ** self.norm
+            scale = scale ** (1.0 / self.norm)
+
+        if scale > 0.0:
+            for i in range(self.n_chroma):
+                self.chroma[i] /= scale
+
+    def next_frame(mut self, mut mags: List[Float64], mut phases: List[Float64]):
+        """Process the next FFT frame.
+
+        Nothing is returned. The chroma values are updated internally and can be accessed via `.chroma`.
+
+        Args:
+            mags: The magnitude values of the current FFT frame.
+            phases: The phase values of the current FFT frame.
+        """
+        self.from_mags(mags)
+
+    @doc_hidden
+    def make_weights(mut self):
+        var frqbins = List[Float64](length=self.window_size, fill=0.0)
+        var A440 = 440.0 * (2.0 ** (self.tuning / Float64(self.n_chroma)))
+
+        for i in range(1, self.window_size):
+            var frequency = self.sample_rate * Float64(i) / Float64(self.window_size)
+            frqbins[i] = Float64(self.n_chroma) * log2(frequency / (A440 / 16.0))
+
+        frqbins[0] = frqbins[1] - 1.5 * Float64(self.n_chroma)
+
+        var n_bins = len(self.weights[0])
+        var n_chroma2 = Float64(self.n_chroma // 2)
+        var n_chroma_f = Float64(self.n_chroma)
+
+        for j in range(n_bins):
+            var binwidthbin = 1.0
+            if j < len(frqbins) - 1:
+                binwidthbin = max(frqbins[j + 1] - frqbins[j], 1.0)
+
+            var col_norm: Float64 = 0.0
+            for i in range(self.n_chroma):
+                var D = frqbins[j] - Float64(i)
+                D = (D + n_chroma2 + 10.0 * n_chroma_f) % n_chroma_f - n_chroma2
+                var scaled = 2.0 * D / binwidthbin
+                var val = exp(-0.5 * scaled * scaled)
+                self.weights[i][j] = val
+                col_norm += val * val
+
+            var scale = sqrt(col_norm)
+            if scale > 0.0:
+                for i in range(self.n_chroma):
+                    self.weights[i][j] /= scale
+
+            if self.octwidth > 0.0:
+                var octave_scaled = (frqbins[j] / n_chroma_f - self.ctroct) / self.octwidth
+                var octave_weight = exp(-0.5 * octave_scaled * octave_scaled)
+                for i in range(self.n_chroma):
+                    self.weights[i][j] *= octave_weight
+
+        if self.base_c:
+            var shift = 3 * (self.n_chroma // 12)
+            for _ in range(shift):
+                for j in range(n_bins):
+                    var first_val = self.weights[0][j]
+                    for i in range(self.n_chroma - 1):
+                        self.weights[i][j] = self.weights[i + 1][j]
+                    self.weights[self.n_chroma - 1][j] = first_val
