@@ -28,13 +28,13 @@ struct VectorBasedPanning(Movable, Copyable):
         
         # 4 speaker setup
         comptime offset = 0.0
-        comptime deg_2_rad = pi/180
+        # comptime deg_2_rad = pi/180
         
         comptime speakers : InlineArray[Float64, 4] = [
-            -65 * deg_2_rad,
-            65 * deg_2_rad,
-            -110 * deg_2_rad,
-            110 * deg_2_rad
+            deg_2_rad(-65),
+            deg_2_rad(65),
+            deg_2_rad(-110),
+            deg_2_rad(110)
         ]
         
         # self.world[].print(speakers[0] == self.az)
@@ -67,3 +67,19 @@ struct VectorBasedPanning(Movable, Copyable):
         
 
         return out * 0.5
+
+
+
+def deg_2_rad(degrees: Float64) -> Float64:
+    """
+    Converts from degrees to radians.
+    """
+    return degrees * (pi/180)
+
+
+
+def rad_2_deg(radians: Float64) -> Float64:
+    """
+    Converts from radians to degrees.
+    """
+    return radians * (180/pi)
