@@ -28,7 +28,6 @@ struct VectorBasedPanning(Movable, Copyable):
         
         # 4 speaker setup
         comptime offset = 0.0
-        # comptime deg_2_rad = pi/180
         
         comptime speakers : InlineArray[Float64, 4] = [
             deg_2_rad(-65),
@@ -37,7 +36,7 @@ struct VectorBasedPanning(Movable, Copyable):
             deg_2_rad(110)
         ]
         
-        # self.world[].print(speakers[0] == self.az)
+        
 
         sig = self.dust.next(10, 40) * 0.5
         sig = self.filt.bpf(sig, 1200, 10.0, 1.0)
