@@ -27,14 +27,14 @@ struct VectorBasedPanning(Movable, Copyable):
         # self.pos[1] = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, -1.0)
         
         # 4 speaker setup
-        comptime two_pi = 2 * pi
         comptime offset = 0.0
-        # self.az = linlin(self.world[].mouse_x, 0.0, 1.0, 0.0, two_pi)
+        comptime deg_2_rad = pi/180
+        
         comptime speakers : InlineArray[Float64, 4] = [
-            0.0 * two_pi + offset,
-            0.25 * two_pi + offset,
-            0.5 * two_pi + offset,
-            0.75 * two_pi + offset
+            -65 * deg_2_rad,
+            65 * deg_2_rad,
+            -110 * deg_2_rad,
+            110 * deg_2_rad
         ]
         
         # self.world[].print(speakers[0] == self.az)

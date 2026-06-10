@@ -442,7 +442,7 @@ def dbap2D[
 # There are multiple versions of vbap2D for using x/y coordinates or azimuth in radians
 
 @always_inline
-def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[Float64, num_speakers]](sample: Float64, az: Float64) -> MFloat[simd_out_size]:
+def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[Float64, num_speakers]](sample: Float64, az: Float64, offset: Float64 = 0.0) -> MFloat[simd_out_size]:
     """
     An implementation of VBAP (Vector Base Amplitude Panning). Pans a mono sample to a 2D array of N speakers of arbitrary positions in radians that are equidistant from the listener.
     For more on VBAP see the paper written by Ville Pulkki:
@@ -456,6 +456,7 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     Args:
         sample: The mono signal to be panned.
         az: The angle of the source in radians.
+        offset: An offset in radians. This rotates the entire speaker array. Is this needed?
 
     Returns:
         MFloat[simd_out_size]: The panned output sample for each speaker.
