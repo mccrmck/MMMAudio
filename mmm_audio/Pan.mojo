@@ -518,8 +518,6 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     comptime speaker_pairs = calc_speaker_pairs[speaker_positions]()
     comptime speaker_inverse_bases = calc_inverse_base[speaker_pairs, speaker_unit_vectors]()
     
-    
-
     var active_speaker_pair : InlineArray[Int, 2] = [0, 0]
     var active_gain_factors = MFloat[2](0.0)
     
