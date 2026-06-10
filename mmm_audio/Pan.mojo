@@ -441,12 +441,12 @@ def dbap2D[
 
 # There are multiple versions of vbap2D for using x/y coordinates or azimuth in radians
 
-
-
 @always_inline
 def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[Float64, num_speakers]](sample: Float64, az: Float64) -> MFloat[simd_out_size]:
     """
-    An implementation of VBAP (Vector Base Amplitude Panning).
+    An implementation of VBAP (Vector Base Amplitude Panning). Pans a mono sample to a 2D array of N speakers of arbitrary positions in radians that are equidistant from the listener.
+    For more on VBAP see the paper written by Ville Pulkki:
+    https://www.audiolabs-erlangen.de/media/pages/resources/aps-w23/papers/935eb793db-1663358804/sap_Pulkki1997.pdf .
 
     Parameters:
         num_speakers: The number of speakers as an integer.
@@ -519,7 +519,7 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     comptime speaker_inverse_bases = calc_inverse_base[speaker_pairs, speaker_unit_vectors]()
     
     
-    # # The right pairs are selected.
+
     var active_speaker_pair : InlineArray[Int, 2] = [0, 0]
     var active_gain_factors = MFloat[2](0.0)
     
@@ -553,10 +553,8 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
                 speaker_a_product[0] + speaker_b_product[0],
                 speaker_a_product[1] + speaker_b_product[1],
             )
-
             
             gain_factors[i] = speaker_gains
-            
         
         var largest_small_gain = 0
         for i in range(num_speakers):
@@ -572,13 +570,10 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
                 largest_small_gain = i 
                 active_index = i
 
-            
-        
         active_pair = speaker_pairs[active_index]
         scaled_gains = (sqrt(gain_factors[active_index].reduce_add()) * gain_factors[active_index]) / (sqrt(pow(gain_factors[active_index], 2).reduce_add()))
         active_gains = scaled_gains
     
-    # if active_speaker_pair != [0, 0]:
     var source_vector = MFloat[2](cos(az), sin(az))
 
     calc_gain_factors(source_vector, active_speaker_pair, active_gain_factors, az)
@@ -589,9 +584,8 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
     gain_factors[Int(active_speaker_pair[0])] = active_gain_factors[0]
     gain_factors[Int(active_speaker_pair[1])] = active_gain_factors[1]
     
-    # The speakers are represented as unit length vectors l_1 and l_2  (to l_n) and the source unit vector p = g_1 * l_1 + g_2 * l_2 (in 2D MFloat[2] is going to be helpful!)
     return gain_factors * sample
-    # return MFloat[simd_out_size](sample)
+    
 
 
 # def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray[MFloat[2], num_speakers]](sample: Float64, pos: MFloat[2]) -> MFloat[simd_out_size]:
