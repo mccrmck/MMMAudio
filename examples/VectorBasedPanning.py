@@ -1,5 +1,5 @@
 """
-An example of Distance Based Amplitude Panning in a 4 channel speaker array where speakers are placed at (-1, 1), (1, 1), (-1,-1) and (1, -1) meters.
+An example of Vector Base Amplitude Panning in a 4 channel speaker array where speakers are placed at azimuths of -55, 55, -110, and 110 degrees.
 
 The position of the audio source is controlled by the mouse. The corners of the screen are positioned directly on top of the speakers.
 """

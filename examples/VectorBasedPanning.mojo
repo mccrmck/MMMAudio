@@ -31,8 +31,8 @@ struct VectorBasedPanning(Movable, Copyable):
         comptime offset = 0.0
         
         comptime speakers : InlineArray[Float64, 4] = [
-            deg_to_rad(-65),
-            deg_to_rad(65),
+            deg_to_rad(-55),
+            deg_to_rad(55),
             deg_to_rad(-110),
             deg_to_rad(110)
         ]
