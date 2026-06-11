@@ -29,7 +29,7 @@ MMMAudio.fake_mouse()
 
 # For WSL
 def wsl_fake_mouse(instance, x_size: int = 300, y_size: int = 300):
-    """Create a GUI slider that sends fake mouse positions to all instances."""
+    """Create a GUI slider that sends fake mouse positions to a single instance."""
     from mmm_python.GUI import Slider2D
     from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout
     from math import atan2
