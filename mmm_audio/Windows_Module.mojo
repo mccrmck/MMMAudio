@@ -23,6 +23,10 @@ struct Windows(Movable, Copyable):
         self.pan2 = pan2_window(256)
         self.gaussian = gaussian_window(self.size)
 
+    def at_pan[interp: Interp = Interp.none](self, world: World, pan: Float64) -> MFloat[2]:
+        """Get the left and right pan multipliers for a given pan value between 0.0 (left) and 1.0 (right). This uses a quarter cosine window for smooth panning."""
+        return SpanInterpolator.read[1,interp,True,self.mask](world,self.hann, pan * 255.0, 0.0)
+
     def at_phase[num_chans: Int, window_type: WindowType, interp: Interp = Interp.none](self, world: World, phase: MFloat[num_chans], prev_phase: MFloat[num_chans] = 0.0) -> MFloat[num_chans]:
         """Get a window value at the given normalized phase.
 

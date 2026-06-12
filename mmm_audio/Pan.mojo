@@ -71,15 +71,7 @@ def splay[num_simd: Int](*input: MFloat[num_simd], world: World) -> MFloat[2]:
             index0 = i // num_simd
             index1 = i % num_simd
             temp = world[].windows.value()
-            pan_mul = SpanInterpolator.read[
-                        interp=Interp.none,
-                        bWrap=False,
-                        mask=255
-                    ](
-                        world = world,
-                        data=temp[].pan2,
-                        f_idx=pan * 255.0
-                    )
+            pan_mul = temp[].at_pan[interp=Interp.none](world, pan)
             out += input[index0][index1] * pan_mul
     return out
 
@@ -112,20 +104,27 @@ def splay[num_simd: Int](input: Span[MFloat[num_simd], ...], world: World) -> MF
             index0 = i // num_simd
             index1 = i % num_simd
             temp = world[].windows.value()
-            pan_mul = SpanInterpolator.read[
-                        interp=Interp.none,
-                        bWrap=False,
-                        mask=255
-                    ](
-                        world = world,
-                        data=temp[].pan2,
-                        f_idx=pan * 255.0
-                    )
+            pan_mul = temp[].at_pan[interp=Interp.none](world, pan)
             out += input[index0][index1] * pan_mul
     return out
 
 @always_inline
 def splay[num_input_channels: Int](input: MFloat[num_input_channels], world: World) -> MFloat[2]:
+    """
+    Splay multiple input channels into stereo output.
+
+    There are multiple versions of splay to handle different input types. It can take a List or InlineArray of SIMD vectors, a VariadicList of SIMD, or a single 1 or many channel SIMD vector. In the case of a list of SIMD vectors, each channel within the vector is treated separately and panned individually.
+
+    Parameters:
+        num_input_channels: Number of input channels.
+
+    Args:
+        input: VariadicList of input samples from multiple channels.
+        world: Pointer to MMMWorld containing the pan_window.
+
+    Returns:
+        Stereo output as MFloat[2].
+    """
     out = MFloat[2](0.0)
 
     for i in range(num_input_channels):
@@ -134,15 +133,7 @@ def splay[num_input_channels: Int](input: MFloat[num_input_channels], world: Wor
         else:
             pan = Float64(i) / Float64(num_input_channels - 1)
             temp = world[].windows.value()
-            pan_mul = SpanInterpolator.read[
-                        interp=Interp.none,
-                        bWrap=False,
-                        mask=255
-                    ](
-                        world = world,
-                        data=temp[].pan2,
-                        f_idx=pan * 255.0
-                    )
+            pan_mul = temp[].at_pan[interp=Interp.none](world, pan)
             out += input[i] * pan_mul
     return out
 

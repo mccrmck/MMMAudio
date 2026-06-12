@@ -301,19 +301,9 @@ def buf_read[num_chans: Int, interp: Interp = Interp.linear, bWrap: Bool = True]
         The envelope value at the specified phase.
     """
     comptime if interp == Interp.sinc:
-        val = SpanInterpolator.read[interp=interp,bWrap=bWrap](
-            world=world,
-            data=env_buffer.data,
-            f_idx=phase * Float64(len(env_buffer.data) - 1),
-            prev_f_idx=prev_phase * Float64(len(env_buffer.data) - 1)
-        )
+        val = env_buffer.at_phase[interp=interp,bWrap=bWrap](world, phase, prev_phase)
     else:
-         val = SpanInterpolator.read[interp=interp,bWrap=bWrap](
-            world=world,
-            data=env_buffer.data,
-            f_idx=phase * Float64(len(env_buffer.data) - 1),
-            prev_f_idx=0.0
-        )
+        val = env_buffer.at_phase[interp=interp,bWrap=bWrap](world, phase, 0.0)
     return val
 
 # min_env is just a function, not a struct
