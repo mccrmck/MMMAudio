@@ -23,6 +23,7 @@ def main():
     poly_pal = PolyPal(mmm_audio, "poly", 16) # the 16 here should match the number of voices in the Poly in the Mojo code
 
     def midi_callback(msg):
+        print(f"Received MIDI message: {msg}")
         if msg.type in ["note_on", "note_off", "control_change"]:
             if msg.type == "note_on":
                 poly_pal.send_ints([msg.note, (msg.velocity)])  
@@ -41,6 +42,12 @@ def main():
 
     # open your midi device - you may need to change the device name
     in_port = mido.open_input('Oxygen Pro Mini USB MIDI', callback = midi_callback)
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting.")
 
 if __name__ == "__main__":
     main()
