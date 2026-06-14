@@ -223,7 +223,7 @@ struct LFSRNoise[num_chans: Int = 1](Copyable, Movable):
         self.rising_bool_detector = RisingBoolDetector[Self.num_chans]()
 
     def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
+        """Sets times oversampling for the oscillator when it is used in an Oversampler loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
 
         Args:
             times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.

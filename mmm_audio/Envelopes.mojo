@@ -407,7 +407,7 @@ struct Compressor[num_chans: Int, ov_samp: TimesOversampling = TimesOversampling
     
     Params:
         num_chans: Number of channels of input/output.
-        ov_samp: Oversampling factor for the compressor.
+        ov_samp: Oversampler factor for the compressor.
     """
 
     var amp: Amplitude[Self.num_chans]
@@ -418,7 +418,7 @@ struct Compressor[num_chans: Int, ov_samp: TimesOversampling = TimesOversampling
     var changed2: Changed[MFloat[1]]
 
     var upsampler: Upsampler[Self.num_chans, Self.ov_samp]
-    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+    var oversampler: Oversampler[Self.num_chans, Self.ov_samp]
 
     def __init__(out self, world: World):
         """Initialize the Compressor struct.
@@ -441,7 +441,7 @@ struct Compressor[num_chans: Int, ov_samp: TimesOversampling = TimesOversampling
         self.amp.set_params(0.001, 0.01)
 
         self.upsampler = Upsampler[Self.num_chans, Self.ov_samp](world)
-        self.oversampling = Oversampling[Self.num_chans, Self.ov_samp](world)
+        self.oversampler = Oversampler[Self.num_chans, Self.ov_samp](world)
     
     def next(mut self, input: MFloat[Self.num_chans], threshold: MFloat[1] = -20.0, ratio: MFloat[1] = 4.0, attack: MFloat[1] = 0.01, release: MFloat[1] = 0.1, knee_width: MFloat[1] = 0.0) -> MFloat[Self.num_chans]:
         """Returns the compressed signal, which is the original signal multiplied by the negative compression gain.
@@ -466,8 +466,8 @@ struct Compressor[num_chans: Int, ov_samp: TimesOversampling = TimesOversampling
                 # upsample the input
                 x2 = self.upsampler.next(input, i)
                 y = self.next_neg_comp(x2, threshold, ratio, attack, release, knee_width) * x2
-                self.oversampling.add_sample(y)
-            return self.oversampling.get_sample()
+                self.oversampler.add_sample(y)
+            return self.oversampler.get_sample()
 
     def next_neg_comp(mut self, input: MFloat[Self.num_chans], threshold: MFloat[1] = -20.0, ratio: MFloat[1] = 4.0, attack: MFloat[1] = 0.01, release: MFloat[1] = 0.1, knee_width: MFloat[1] = 0.0) -> MFloat[1]:
         """Returns the negative compression gain (in amplitude units, not dB) for the input signal, which can be multiplied with the original signal or used as a sidechain.

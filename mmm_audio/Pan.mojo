@@ -165,7 +165,7 @@ def splay_n[simd_in_width: Int, num_speakers: Int, simd_out_size: Int, pan_point
         simd_in_width: Number of channels in each SIMD input.
         num_speakers: Number of output speakers. Must be less than or equal to simd_out_size.
         simd_out_size: Number of channels of the SIMD output vector. Must be a power of two that is at least as large as num_speakers.
-        pan_points: Number of discrete pan points to calculate for the panning algorithm. More pan points will increase the resolution of the pan but also increase CPU usage. 100 is usually sufficient for smooth panning.    
+        pan_points: Number of discrete pan points to calculate for the panning algorithm. More pan points will increase the resolution of the pan but also increase CPU usage. 100 is usually sufficient for smooth panning.
 
     Args:
         input: Span of input samples from multiple channels, where each channel is a SIMD vector.

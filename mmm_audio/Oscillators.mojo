@@ -16,8 +16,9 @@ struct Phasor[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling
     """
     var phase: MFloat[Self.num_chans]
     var freq_mul: Float64
-    var rising_bool_detector: RisingBoolDetector[Self.num_chans]  # Track the last reset state
-    var rising_bool_detector_impulse: RisingBoolDetector[Self.num_chans]  # Track the last reset state
+    var rising_bool_detector: RisingBoolDetector[Self.num_chans]
+    var rising_bool_detector_impulse: RisingBoolDetector[Self.num_chans]
+    var oversampler: Optional[Oversampler[Self.num_chans, Self.ov_samp]]
     var world: World  # Pointer to the MMMWorld instance
 
     def __init__(out self, world: World):
@@ -31,19 +32,24 @@ struct Phasor[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling
         self.freq_mul = 1.0 / (Float64(Self.ov_samp.times) * self.world[].sample_rate)
         self.rising_bool_detector = RisingBoolDetector[Self.num_chans]()
         self.rising_bool_detector_impulse = RisingBoolDetector[Self.num_chans]()
+        self.oversampler = None
+        if Self.ov_samp != TimesOversampling.none:
+            self.oversampler = Oversampler[Self.num_chans, Self.ov_samp](self.world)
 
     @doc_hidden
     @always_inline
     def _increment_phase(mut self: Phasor, freq: MFloat[self.num_chans]):
         self.phase += (freq * self.freq_mul)
         self.phase = self.phase - floor(self.phase)
+        
+            
 
     @doc_hidden
     @always_inline
     def _increment_phase_impulse(mut self, freq: MFloat[self.num_chans], phase_offset: MFloat[self.num_chans] = 0.0) -> MBool[Self.num_chans]:
         """Increments the phase and returns a boolean SIMD indicating when the phase wraps around from 1.0 to 0.0, which is when an impulse would occur. This only works with possive frequencies and phase offsets between 0.0 and 1.0."""
 
-        self.phase += (abs(freq) * self.freq_mul)
+        self.phase += (freq * self.freq_mul)
         fl = floor(self.phase)
         rbd = self.rising_bool_detector_impulse.next(abs(self.phase+clip(phase_offset, 0.0, 1.0)).gt(1.0))
         self.phase = self.phase - fl 
@@ -61,13 +67,21 @@ struct Phasor[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling
         Returns:
             The next sample of the phasor output.
         """
-        self._increment_phase(freq)
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
+            self._increment_phase(freq)
+        else:
+            for _ in range(Self.ov_samp.times):
+                self._increment_phase(freq)
+                self.oversampler.value().add_sample(self.phase)
         
         var resets = self.rising_bool_detector.next(trig)
         self.phase = resets.select(0.0, self.phase)
-        
-        return (self.phase + phase_offset) % 1.0
-
+        comptime if not uses_oversampler:
+            return (self.phase + phase_offset) % 1.0
+        else:
+            return (self.oversampler.value().get_sample() + phase_offset) % 1.0
+            
     @always_inline
     def next_bool(mut self, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: MBool[self.num_chans] = MBool[self.num_chans](fill=True)) -> MBool[self.num_chans]:
         """Increments the phasor and returns a boolean impulse when the phase wraps around from 1.0 to 0.0. This only works with possive frequencies and phase offsets between 0.0 and 1.0.
@@ -80,12 +94,21 @@ struct Phasor[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling
         Returns:
             A boolean SIMD indicating True when the impulse occurs.
         """
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
+            tick = self._increment_phase_impulse(freq, phase_offset)
+            rbd = self.rising_bool_detector.next(trig)
+            self.phase = rbd.select(0.0, self.phase)
+            
+            return (tick | rbd)
+        else:
+            tick = False
+            for _ in range(Self.ov_samp.times):
+                tick = tick | self._increment_phase_impulse(freq, phase_offset)
+            rbd = self.rising_bool_detector.next(trig)
+            self.phase = rbd.select(0.0, self.phase)
 
-        tick = self._increment_phase_impulse(freq, phase_offset)
-        rbd = self.rising_bool_detector.next(trig)
-        self.phase = rbd.select(0.0, self.phase)
-        
-        return (tick or rbd)
+            return (tick | rbd)
 
     @always_inline
     def next_impulse(mut self, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: MBool[self.num_chans] = MBool[self.num_chans](fill=   True)) -> MFloat[self.num_chans]:
@@ -100,15 +123,22 @@ struct Phasor[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling
             The next impulse sample as a Float64. 1.0 when the impulse occurs, 0.0 otherwise.
         """
 
-        return self.next_bool(freq, phase_offset, trig).cast[DType.float64]()
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
+            tick = self._increment_phase_impulse(freq, phase_offset)
+            rbd = self.rising_bool_detector.next(trig)
+            self.phase = rbd.select(0.0, self.phase)
+            
+            return (tick | rbd).cast[DType.float64]()
+        else:
+            for _ in range(Self.ov_samp.times):
+                tick = self._increment_phase_impulse(freq, phase_offset)
+                rbd = self.rising_bool_detector.next(trig)
+                self.oversampler.value().add_sample((tick | rbd).cast[DType.float64]())
+            
+                self.phase = rbd.select(0.0, self.phase)
 
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.freq_mul = TimesOversampling.get_freq_mul(self.world, times_oversampling)
+            return self.oversampler.value().get_sample()
 
 
 struct Impulse[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversampling.none](Movable, Copyable):
@@ -131,14 +161,6 @@ struct Impulse[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversamplin
             world: Pointer to the MMMWorld instance.
         """
         self.phasor = Phasor[self.num_chans, Self.ov_samp](world)
-
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.phasor.set_oversampling(times_oversampling)
 
     @always_inline
     def next_bool(mut self, freq: MFloat[self.num_chans] = 100.0, phase_offset: MFloat[self.num_chans] = 0.0, trig: MBool[self.num_chans] = MBool[self.num_chans](fill=True)) -> MBool[self.num_chans]:
@@ -173,7 +195,7 @@ struct Impulse[num_chans: Int = 1, ov_samp: TimesOversampling = TimesOversamplin
 struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOversampling = TimesOversampling.none](Movable, Copyable):
     """Wavetable Oscillator Core.
 
-    A wavetable oscillator capable of all standard waveforms and also able to load custom wavetables. Capable of linear, cubic, quadratic, lagrange, or sinc interpolation. Also capable of [Oversampling](Oversampling.md).
+    A wavetable oscillator capable of all standard waveforms and also able to load custom wavetables. Capable of linear, cubic, quadratic, lagrange, or sinc interpolation. Also capable of using an internal [Oversampler](Oversampler.md).
     
     - Pure tones can be generated without oversampling or sinc interpolation.
     - When doing extreme modulation, best practice is to use sinc interpolation and an oversampling index of 1 (2x).
@@ -185,9 +207,9 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
         ov_samp: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
     """
 
-    var phasor: Phasor[Self.num_chans, Self.ov_samp]
+    var phasor: Phasor[Self.num_chans]
     var world: World 
-    var oversampling: Oversampling[Self.num_chans, Self.ov_samp]
+    var oversampler: Optional[Oversampler[Self.num_chans, Self.ov_samp]]
     var last_phase: MFloat[Self.num_chans]
 
     def __init__(out self, world: World):
@@ -197,17 +219,12 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
             world: Pointer to the MMMWorld instance.
         """
         self.world = world
-        self.phasor = Phasor[self.num_chans, Self.ov_samp](self.world)
-        self.oversampling = Oversampling[self.num_chans, Self.ov_samp](self.world)
+        self.phasor = Phasor[self.num_chans](self.world)
+        if Self.ov_samp == TimesOversampling.none:
+            self.oversampler = None
+        else:
+            self.oversampler = Oversampler[Self.num_chans, Self.ov_samp](self.world)
         self.last_phase = MFloat[self.num_chans](0.0)
-
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.phasor.set_oversampling(times_oversampling)
 
     @always_inline
     def next[osc_type: OscType = OscType.sine](
@@ -230,11 +247,13 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
         Returns:
             The next sample of the oscillator output.
         """
+        
         var trig_mask = MBool[self.num_chans](fill=trig)
             
         out = MFloat[self.num_chans](0.0)
 
-        comptime if Self.ov_samp == TimesOversampling.none:
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
             phase = self.phasor.next(freq, phase_offset, trig_mask)
             temp = self.world[].osc_buffers.value()
             comptime for chan in range(self.num_chans):
@@ -242,17 +261,17 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
             self.last_phase = phase
             return out
         else:
-            comptime for i in range(Self.ov_samp.times):
+            comptime for _ in range(Self.ov_samp.times):
                 phase = self.phasor.next(freq, phase_offset, trig_mask)
 
                 sample = MFloat[self.num_chans](0.0)
                 temp = self.world[].osc_buffers.value()
                 comptime for chan in range(self.num_chans):
                     sample[chan] = temp[].at_phase[osc_type, self.interp](self.world, phase[chan], self.last_phase[chan])
-                self.oversampling.add_sample(sample)  # Get the next sample from the Oscillator buffer using sinc interpolation
+                self.oversampler.value().add_sample(sample)  # Get the next sample from the Oscillator buffer using sinc interpolation
                 self.last_phase = phase
 
-            return self.oversampling.get_sample()
+            return self.oversampler.value().get_sample()
 
     @always_inline
     def next_all_basic_waveforms(
@@ -323,7 +342,8 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
         osc_frac_interp = scaled_osc_frac - floor(scaled_osc_frac) 
         var out_sample = MFloat[self.num_chans](0.0) 
 
-        comptime if Self.ov_samp == TimesOversampling.none:
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
             var phase = self.phasor.next(freq, phase_offset, trig_mask)
             comptime for chan in range(self.num_chans):
                 sample = self.next_all_basic_waveforms(freq[chan], phase[chan], self.last_phase[chan], trig)
@@ -331,14 +351,14 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
             self.last_phase = phase
             return out_sample
         else:
-            comptime for i in range(Self.ov_samp.times):
+            comptime for _ in range(Self.ov_samp.times):
                 var phase = self.phasor.next(freq, phase_offset, trig_mask)
                 comptime for chan in range(self.num_chans):
                     sample = self.next_all_basic_waveforms(freq[chan], phase[chan], self.last_phase[chan], trig)
                     out_sample[chan] = (MFloat[2](sample[Int(osc_type0[chan])], sample[Int(osc_type1[chan])]) * MFloat[2](1.0 - osc_frac_interp[chan], osc_frac_interp[chan])).reduce_add()
-                self.oversampling.add_sample(out_sample)
+                self.oversampler.value().add_sample(out_sample)
                 self.last_phase = phase
-            return self.oversampling.get_sample()
+            return self.oversampler.value().get_sample()
    
     @always_inline
     def next_vwt(
@@ -377,7 +397,8 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
         var sample0 = MFloat[self.num_chans](0.0)
         var sample1 = MFloat[self.num_chans](0.0)
 
-        comptime if Self.ov_samp == TimesOversampling.none:
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
             # var last_phase = self.phasor.phase
             var phase = self.phasor.next(freq, phase_offset, trig_mask)
             comptime for out_chan in range(self.num_chans):
@@ -393,9 +414,9 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
                 comptime for out_chan in range(self.num_chans):
                     sample0[out_chan] = buffer.at_phase[self.interp, True, 0](self.world, Int(buf_chan0[out_chan]), phase[out_chan], self.last_phase[out_chan])
                     sample1[out_chan] = buffer.at_phase[self.interp, True, 0](self.world, Int(buf_chan1[out_chan]), phase[out_chan], self.last_phase[out_chan])
-                self.oversampling.add_sample(linear_interp(sample0, sample1, scaled_osc_frac))
+                self.oversampler.value().add_sample(linear_interp(sample0, sample1, scaled_osc_frac))
                 self.last_phase = phase
-            return self.oversampling.get_sample()
+            return self.oversampler.value().get_sample()
 
     @always_inline
     def next_vwt[simd_chans: Int](
@@ -434,8 +455,8 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
 
         scaled_osc_frac = chan0_fl - floor(chan0_fl)
 
-        comptime if Self.ov_samp == TimesOversampling.none:
-            # var last_phase = self.phasor.phase
+        comptime uses_oversampler = Self.ov_samp != TimesOversampling.none
+        comptime if not uses_oversampler:
             var phase = self.phasor.next(freq, phase_offset, trig_mask)
             out_sample = MFloat[self.num_chans](0.0)
             comptime for out_chan in range(self.num_chans):
@@ -446,16 +467,16 @@ struct Osc[num_chans: Int = 1, interp: Interp = Interp.linear, ov_samp: TimesOve
             return out_sample
         else:
             comptime times_os_int = Self.ov_samp.times
-            comptime for i in range(times_os_int):
+            comptime for _ in range(times_os_int):
                 # var last_phase = self.phasor.phase
                 var phase = self.phasor.next(freq, phase_offset, trig_mask)
                 out_sample = MFloat[self.num_chans](0.0)
                 comptime for out_chan in range(self.num_chans):
                     sample = buffer.at_phase[self.interp, True, 0](self.world, phase[out_chan], self.last_phase[out_chan])
                     out_sample[out_chan] = (MFloat[2](sample[Int(buf_chan0[out_chan])], sample[Int(buf_chan1[out_chan])]) * MFloat[2](1.0 - scaled_osc_frac[out_chan], scaled_osc_frac[out_chan])).reduce_add()
-                self.oversampling.add_sample(out_sample)
+                self.oversampler.value().add_sample(out_sample)
                 self.last_phase = phase
-            return self.oversampling.get_sample()
+            return self.oversampler.value().get_sample()
 
 struct OscBank[num: Int](Movable, Copyable):
     """A convenience struct for processing a bank of Osc's with fixed frequencies. The number are indicated by the num parameter. Each output can be accessed via index.
@@ -498,7 +519,7 @@ struct OscBank[num: Int](Movable, Copyable):
             out += self.oscs[i].next[osc_type=osc_type](self.freqs[i])
         return out.reduce_add() / Float64(Self.num) 
 
-struct LFOsc[num_chans: Int = 1] (Movable, Copyable):
+struct LFOsc[num_chans: Int = 1, times_ov_samp: TimesOversampling = TimesOversampling.none] (Movable, Copyable):
     """A low-frequency oscillator with multiple waveform options.
     
     This oscillator generates a non-bandlimited oscillator capable of saw, triangle, and square waves. It is useful for modulation, but should be avoided for audio-rate synthesis due to aliasing.
@@ -507,9 +528,10 @@ struct LFOsc[num_chans: Int = 1] (Movable, Copyable):
 
     Parameters:
         num_chans: Number of channels (default is 1).
+        times_ov_samp: Times oversampling for the oscillator.
     """
 
-    var phasor: Phasor[Self.num_chans]
+    var phasor: Phasor[Self.num_chans, Self.times_ov_samp]
     var world: World 
 
     def __init__(out self, world: World):
@@ -518,7 +540,7 @@ struct LFOsc[num_chans: Int = 1] (Movable, Copyable):
         Args:
             world: Pointer to the MMMWorld instance.
         """
-        self.phasor = Phasor[self.num_chans](world)
+        self.phasor = Phasor[self.num_chans, Self.times_ov_samp](world)
         self.world = world
 
     @always_inline
@@ -527,7 +549,7 @@ struct LFOsc[num_chans: Int = 1] (Movable, Copyable):
 
         Parameters:
             osc_type: Waveform type to generate.
-        
+
         Args:
             freq: Frequency of the sawtooth wave in Hz.
             phase_offset: Offsets the phase of the oscillator (default is 0.0).
@@ -547,14 +569,6 @@ struct LFOsc[num_chans: Int = 1] (Movable, Copyable):
         else:
             phase = self.phasor.next(freq, phase_offset, trig_mask)
             return sin(phase * two_pi)
-
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.phasor.set_oversampling(times_oversampling)
 
 struct Dust[num_chans: Int = 1] (Movable, Copyable):
     """A dust noise oscillator that generates random impulses at random intervals.
@@ -618,14 +632,6 @@ struct Dust[num_chans: Int = 1] (Movable, Copyable):
 
     def set_phase(mut self, phase: MFloat[self.num_chans]):
         self.impulse.phase = phase
-
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.impulse.set_oversampling(times_oversampling)
 
 
 struct TTrig(Movable, Copyable):
@@ -750,14 +756,6 @@ struct LFNoise[num_chans: Int = 1, interp: Interp = Interp.cubic](Movable, Copya
             # Cubic interpolation
             return cubic_interp(p0, p1, p2, p3, self.impulse.phase)
 
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.impulse.set_oversampling(times_oversampling)
-
 struct Sweep[num_chans: Int = 1](Movable, Copyable):
     """A phase accumulator.
     
@@ -802,14 +800,6 @@ struct Sweep[num_chans: Int = 1](Movable, Copyable):
         self.phase = resets.select(0.0, self.phase)
 
         return self.phase
-
-    def set_oversampling(mut self, times_oversampling: TimesOversampling):
-        """Sets times oversampling for the oscillator when it is used in an Oversampling loop. This is not for when using the oscillator with the built-in oversampling, but rather for when the oscillator is used as part of a custom oversampling implementation.
-
-        Args:
-            times_oversampling: An [oversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
-        """
-        self.freq_mul = TimesOversampling.get_freq_mul(self.world, times_oversampling)
 
 struct Line[num_chans: Int = 1, linexpcurve: Int = 0](Movable, Copyable):
     """

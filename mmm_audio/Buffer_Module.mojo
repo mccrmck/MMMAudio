@@ -592,4 +592,4 @@ struct SpanInterpolator(Movable, Copyable):
         Returns:
             The sinc-interpolated sample value.
         """
-        return world[].sinc_interpolator.sinc_interp[num_chans,bWrap,mask](data, f_idx, prev_f_idx)
+        return world[].sinc_interpolator.value()[].sinc_interp[num_chans,bWrap,mask](data, f_idx, prev_f_idx)
