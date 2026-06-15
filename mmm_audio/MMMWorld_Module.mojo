@@ -167,7 +167,7 @@ struct MMMWorld(Movable, Copyable):
 def create_subworld(world: World, times_ov_samp: TimesOversampling = TimesOversampling.none) -> UnsafePointer[MMMWorld, MutExternalOrigin]:
     """Initializes the MMMWorld struct from a pointer to an existing World struct.
 
-    This is for when the user is given a pointer to a World struct in their synth's __init__ function, and they want to initialize the MMMWorld struct with the values from that World struct. This is the most common way that users will initialize the MMMWorld struct.
+    This is mostly used to create an oversampled subworld with a higher sample rate based on the main world.
 
     Args:
         world: A pointer to an existing World struct.
