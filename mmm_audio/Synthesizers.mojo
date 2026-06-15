@@ -46,7 +46,7 @@ struct PAF[
         comptime if Self.ov_samp != TimesOversampling.none:
             self.downsampler = Optional[Downsampler[Self.num_chans, Self.ov_samp]](
                 Downsampler[Self.num_chans, Self.ov_samp](
-                    world # use main world for oversampler, not the oversampled subworld
+                    world # use main world for downsampler, not the oversampled subworld
                 )
             )
 
