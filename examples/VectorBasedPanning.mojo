@@ -27,16 +27,19 @@ struct VectorBasedPanning(Movable, Copyable):
 
         self.messenger.update("az", self.az)
         self.messenger.update("pos", self.pos)
-        self.messenger.update("wsl", self.wsl)
+        # self.messenger.update("wsl", self.wsl)
         
-        if self.wsl == 0:
+        # if self.wsl == 0:
             
-            var x = linlin(self.world[].mouse_x, 0.0, 1.0, -1.0, 1.0)
-            var y = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, -1.0)
-            self.az = atan2(y, x)
-        else:
-            self.az = atan2(self.pos[1], self.pos[0])
+            # var x = linlin(self.world[].mouse_x, 0.0, 1.0, -1.0, 1.0)
+            # var y = linlin(self.world[].mouse_y, 0.0, 1.0, 1.0, -1.0)
+        #     self.az = atan2(y, x)
+        # else:
+        #     self.az = atan2(self.pos[1], self.pos[0])
             
+        var x = linlin(self.world[].mouse_x(), 0.0, 1.0, -1.0, 1.0)
+        var y = linlin(self.world[].mouse_y(), 0.0, 1.0, 1.0, -1.0)
+        self.az = atan2(y, x)
         # 4 speaker setup
         comptime offset = deg_to_rad(90)
         
