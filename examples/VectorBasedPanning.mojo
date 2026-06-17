@@ -11,6 +11,7 @@ struct VectorBasedPanning(Movable, Copyable):
     var filt: Reson[1]
     var wsl: Int
     var pos: List[Float64]
+    var mouse: Bool
     def __init__(out self, world: World):
         self.world = world
         self.dust = Dust[1](world)
@@ -19,6 +20,7 @@ struct VectorBasedPanning(Movable, Copyable):
         self.az = 0.0
         self.wsl = 0
         self.pos = [0.0, -1.0]
+        self.mouse = False
 
     def next(mut self) -> MFloat[8]:
         
@@ -27,6 +29,7 @@ struct VectorBasedPanning(Movable, Copyable):
 
         self.messenger.update("az", self.az)
         self.messenger.update("pos", self.pos)
+        self.messenger.update("mouse", self.mouse)
         # self.messenger.update("wsl", self.wsl)
         
         # if self.wsl == 0:
@@ -36,12 +39,16 @@ struct VectorBasedPanning(Movable, Copyable):
         #     self.az = atan2(y, x)
         # else:
         #     self.az = atan2(self.pos[1], self.pos[0])
-            
-        var x = linlin(self.world[].mouse_x(), 0.0, 1.0, -1.0, 1.0)
-        var y = linlin(self.world[].mouse_y(), 0.0, 1.0, 1.0, -1.0)
-        self.az = atan2(y, x)
-        # 4 speaker setup
+
         comptime offset = deg_to_rad(90)
+        if self.mouse:
+            var x = linlin(self.world[].mouse_x(), 0.0, 1.0, -1.0, 1.0)
+            var y = linlin(self.world[].mouse_y(), 0.0, 1.0, 1.0, -1.0)
+            self.az = atan2(y, x) + offset
+        
+        
+        # 4 speaker setup
+        
         
         comptime speakers : InlineArray[Float64, 4] = [
             deg_to_rad(-55),
@@ -55,7 +62,7 @@ struct VectorBasedPanning(Movable, Copyable):
         sig = self.dust.next(10, 40) * 0.5
         sig = self.filt.bpf(sig, 1200, 10.0, 1.0)
 
-        out = vbap2D[4, max_simd, speakers](sig, self.az + offset)
+        out = vbap2D[4, max_simd, speakers](sig, self.az)
         
 
         #7 speaker setup

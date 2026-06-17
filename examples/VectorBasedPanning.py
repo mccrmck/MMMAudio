@@ -6,7 +6,7 @@ The position of the audio source is controlled by the mouse. The corners of the 
 
 from mmm_python import *
 from math import pi
-from wsl_fixes import MMMAudioWSL
+# from wsl_fixes import MMMAudioWSL
 # instantiate and load the graph
 mmm_audio = MMMAudio(128, num_output_channels=4, graph_name="VectorBasedPanning", package_name="examples")
 
@@ -20,6 +20,11 @@ mmm_audio.send_float("az", 0.5 * 2 * pi)
 mmm_audio.send_float("az", 0.625 * 2 * pi)
 mmm_audio.send_float("az", 0.75 * 2 * pi)
 mmm_audio.send_float("az", 0.875 * 2 * pi)
+
+
+#Enable/disable mouse
+mmm_audio.send_bool("mouse", True)
+mmm_audio.send_bool("mouse", False)
 
 # for Wayland use the fake mouse
 MMMAudio.fake_mouse()
