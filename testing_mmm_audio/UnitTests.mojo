@@ -471,11 +471,11 @@ def test_linmap() raises:
     assert_almost_equal(result, expected, "Test: linmap function failed")
 
 def test_env() raises:
-    osc_buffers: Optional[UnsafePointer[mut=True, OscBuffers, MutExternalOrigin]] = alloc[OscBuffers](1)
+    osc_buffers: Optional[UnsafePointer[mut=True, OscBuffers, MutUntrackedOrigin]] = alloc[OscBuffers](1)
     osc_buffers.value().init_pointee_move(OscBuffers())
-    windows: Optional[UnsafePointer[mut=True, Windows, MutExternalOrigin]] = alloc[Windows](1)
+    windows: Optional[UnsafePointer[mut=True, Windows, MutUntrackedOrigin]] = alloc[Windows](1)
     windows.value().init_pointee_move(Windows())
-    world_info: Optional[UnsafePointer[mut=True, WorldInfo, MutExternalOrigin]] = alloc[WorldInfo](1)
+    world_info: Optional[UnsafePointer[mut=True, WorldInfo, MutUntrackedOrigin]] = alloc[WorldInfo](1)
     world_info.value().init_pointee_move(WorldInfo())
 
     world = alloc[MMMWorld](1) 
