@@ -59,7 +59,7 @@ struct ToggleBool[num_chans: Int = 1](Movable, Copyable):
 
         return self.state
 
-struct Changed[T: Equatable & ImplicitlyCopyable](Movable, Copyable):
+struct Changed[T: Equatable & ImplicitlyCopyable & ImplicitlyDeletable](Movable, Copyable):
     """Detect changes in a Bool, Int, or Float64 value.
     
     Parameters:

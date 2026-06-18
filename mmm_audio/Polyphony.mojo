@@ -44,7 +44,8 @@ trait PolyObject(Movable, Copyable):
 
         Objects that conform to the PolyReset trait usually need to be reset if a PolyObject is stopped and started. Delays and filters are obvious examples of this. They will have residual information in them when they are stopped, and that information needs to be cleared before the next time they are started.
         """
-        comptime r = reflect[Self]()
+        pass
+        comptime r = reflect[Self]
         comptime names = r.field_names()
         comptime types = r.field_types()
         
@@ -394,7 +395,7 @@ struct Poly(Movable, Copyable):
 
 from mmm_audio import *
 
-trait GrainObject(PolyObject):
+trait GrainObject(PolyObject, ImplicitlyDeletable):
     """Trait for objects that can be used as grains in the TGrains struct for triggered granular synthesis."""
 
     def __init__(out self, world: World):

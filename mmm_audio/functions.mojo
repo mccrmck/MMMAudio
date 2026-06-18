@@ -840,7 +840,7 @@ def coin[num_chans:Int](p: MFloat[num_chans]) -> MBool[num_chans]:
     coins = rands.lt(q)
     return coins
 
-def rotate_left_inplace[T: Movable & Copyable & ImplicitlyCopyable](mut data: List[T], N: Int):
+def rotate_left_inplace[T: Movable & Copyable & ImplicitlyCopyable & ImplicitlyDeletable](mut data: List[T], N: Int):
     """Rotates a list to the left by N positions in-place.
 
     Parameters:

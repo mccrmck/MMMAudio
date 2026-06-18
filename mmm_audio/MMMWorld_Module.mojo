@@ -33,7 +33,7 @@ struct WorldInfo(Movable, Copyable):
         self.last_print_flag = 0
         self.print_counter = 0
 
-    def update_input(mut self, input_buffer: UnsafePointer[mut=True, Float64, MutExternalOrigin]):
+    def update_input(mut self, input_buffer: UnsafePointer[mut=True, Float64, MutUntrackedOrigin]):
         """Updates the input buffer values in the WorldInfo struct.
 
         This should be called at the beginning of each audio block to update the input buffer values from the host DAW.
@@ -51,19 +51,19 @@ struct MMMWorld(Movable, Copyable):
     In pretty much all usage, don't edit this struct.
     """
     var sample_rate: Float64
-    var world_info: Optional[UnsafePointer[mut=True, WorldInfo, MutExternalOrigin]]
-    var osc_buffers: Optional[UnsafePointer[mut=True, OscBuffers, MutExternalOrigin]]
+    var world_info: Optional[UnsafePointer[mut=True, WorldInfo, MutUntrackedOrigin]]
+    var osc_buffers: Optional[UnsafePointer[mut=True, OscBuffers, MutUntrackedOrigin]]
     # windows
-    var windows: Optional[UnsafePointer[mut=True, Windows, MutExternalOrigin]]
-    var messenger_manager: Optional[UnsafePointer[mut=True, MessengerManager, MutExternalOrigin]]
-    var sinc_interpolator: Optional[UnsafePointer[mut=True, SincInterpolator[4, 14], MutExternalOrigin]]
+    var windows: Optional[UnsafePointer[mut=True, Windows, MutUntrackedOrigin]]
+    var messenger_manager: Optional[UnsafePointer[mut=True, MessengerManager, MutUntrackedOrigin]]
+    var sinc_interpolator: Optional[UnsafePointer[mut=True, SincInterpolator[4, 14], MutUntrackedOrigin]]
 
     def __init__(out self, sample_rate: Float64,
-        world_info_ptr: Optional[UnsafePointer[WorldInfo, MutExternalOrigin]] = None,
-        osc_buffers_ptr: Optional[UnsafePointer[OscBuffers, MutExternalOrigin]] = None, 
-        windows_ptr: Optional[UnsafePointer[Windows, MutExternalOrigin]] = None, 
-        messenger_manager_ptr: Optional[UnsafePointer[MessengerManager, MutExternalOrigin]] = None,
-        sinc_interpolator_ptr: Optional[UnsafePointer[SincInterpolator[4, 14], MutExternalOrigin]] = None
+        world_info_ptr: Optional[UnsafePointer[WorldInfo, MutUntrackedOrigin]] = None,
+        osc_buffers_ptr: Optional[UnsafePointer[OscBuffers, MutUntrackedOrigin]] = None, 
+        windows_ptr: Optional[UnsafePointer[Windows, MutUntrackedOrigin]] = None, 
+        messenger_manager_ptr: Optional[UnsafePointer[MessengerManager, MutUntrackedOrigin]] = None,
+        sinc_interpolator_ptr: Optional[UnsafePointer[SincInterpolator[4, 14], MutUntrackedOrigin]] = None
     ):
         """Initializes the MMMWorld struct.
 
@@ -145,7 +145,7 @@ struct MMMWorld(Movable, Copyable):
         """
         return self.world_info.value()[].sound_in[chan]
 
-    def sound_in_ptr(self) -> Pointer[mut=True, List[Float64], MutExternalOrigin]:
+    def sound_in_ptr(self) -> Pointer[mut=True, List[Float64], MutUntrackedOrigin]:
         """Returns a pointer to the input buffer values.
 
         The buffer is interleaved and has a length of block_size * num_in_chans.
@@ -188,7 +188,7 @@ struct MMMWorld(Movable, Copyable):
                 comptime for i in range(values.__len__()):
                     print(values[i], end=sep if i < values.__len__() - 1 else end)
 
-def create_subworld(world: World, times_ov_samp: TimesOversampling = TimesOversampling.none) -> UnsafePointer[MMMWorld, MutExternalOrigin]:
+def create_subworld(world: World, times_ov_samp: TimesOversampling = TimesOversampling.none) -> UnsafePointer[MMMWorld, MutUntrackedOrigin]:
     """Initializes the MMMWorld struct from a pointer to an existing World struct.
 
     This is mostly used to create an oversampled subworld with a higher sample rate based on the main world.

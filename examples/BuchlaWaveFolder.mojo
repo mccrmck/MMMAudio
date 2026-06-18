@@ -19,4 +19,4 @@ struct BuchlaWaveFolder(Movable, Copyable):
         sample = self.osc.next[OscType.sine](40)
         sample = buchla_wavefolder(sample, amp)
 
-        return sample
+        return sample * 0.2

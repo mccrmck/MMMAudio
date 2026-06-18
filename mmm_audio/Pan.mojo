@@ -532,8 +532,6 @@ def vbap2D[num_speakers: Int, simd_out_size: Int, speaker_positions: InlineArray
 
     calc_gain_factors(source_vector, active_speaker_pair, active_gain_factors, az)
    
-    
-    
     var gain_factors = MFloat[simd_out_size](0.0)
     
     gain_factors[Int(active_speaker_pair[0])] = active_gain_factors[0]

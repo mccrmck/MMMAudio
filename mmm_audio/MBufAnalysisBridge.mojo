@@ -6,7 +6,7 @@ from std.os import abort
 from mmm_audio import *
 
 @export
-def PyInit_MBufAnalysisBridge() -> PythonObject:
+def PyInit_MBufAnalysisBridge() abi("C") -> PythonObject:
     try:
         var m = PythonModuleBuilder("MBufAnalysisBridge")
         m.def_function[MBufAnalysisBridge.rms]("rms")
@@ -180,7 +180,10 @@ struct MBufAnalysisBridge:
 
         w = alloc[MMMWorld](1) 
         # TODO: need to find a new way to pass the missing pointers
-        w.init_pointee_move(MMMWorld(analysis_params.buf.sample_rate))
+        world_info = alloc[WorldInfo](1)
+        world_info.init_pointee_move(WorldInfo(64, 2, 2))
+
+        w.init_pointee_move(MMMWorld(analysis_params.buf.sample_rate, world_info))
 
         # run the analysis
         sf_onsets = SpectralFluxOnsets(w,window_size,hop_size,filter_size)

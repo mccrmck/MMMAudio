@@ -13,7 +13,7 @@ from examples.Grains import Grains
 # this is needed to make the module importable in Python - so simple!
 @doc_hidden
 @export
-def PyInit_GrainsBridge() -> PythonObject:
+def PyInit_GrainsBridge() abi("C") -> PythonObject:
     try:
         var m = PythonModuleBuilder("GrainsBridge")
 
@@ -44,11 +44,11 @@ def PyInit_GrainsBridge() -> PythonObject:
 struct MMMAudioBridge(Movable, Writable):
     var world: World
     var graph: Grains  # The audio graph instance
-    var world_info: Optional[UnsafePointer[mut=True, WorldInfo, MutExternalOrigin]]
-    var osc_buffers: Optional[UnsafePointer[mut=True, OscBuffers, MutExternalOrigin]] 
-    var windows: Optional[UnsafePointer[mut=True, Windows, MutExternalOrigin]]
-    var messenger_manager: Optional[UnsafePointer[mut=True, MessengerManager, MutExternalOrigin]] 
-    var sinc_interpolator: Optional[UnsafePointer[mut=True, SincInterpolator[4, 14], MutExternalOrigin]]
+    var world_info: Optional[UnsafePointer[mut=True, WorldInfo, MutUntrackedOrigin]]
+    var osc_buffers: Optional[UnsafePointer[mut=True, OscBuffers, MutUntrackedOrigin]] 
+    var windows: Optional[UnsafePointer[mut=True, Windows, MutUntrackedOrigin]]
+    var messenger_manager: Optional[UnsafePointer[mut=True, MessengerManager, MutUntrackedOrigin]] 
+    var sinc_interpolator: Optional[UnsafePointer[mut=True, SincInterpolator[4, 14], MutUntrackedOrigin]]
 
     # def(args: PythonObject, kwargs: PythonObject) raises -> MMMAudioBridge
     @staticmethod
