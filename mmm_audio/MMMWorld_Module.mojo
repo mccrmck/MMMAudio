@@ -51,8 +51,40 @@ struct MMMWorld(Movable, Copyable):
     var sample_rate: Float64
     var environment_ptr: Optional[UnsafePointer[mut=True, Environment, MutUntrackedOrigin]]
 
+    def windows(self) -> ref[self.environment_ptr.value()[].windows] Windows:
+        """Returns a reference to the Windows struct for accessing predefined windows.
+
+        Returns:
+            A reference to the Windows struct.
+        """
+        return self.environment_ptr.value()[].windows
+
+    def sinc_interpolator(self) -> ref[self.environment_ptr.value()[].sinc_interpolator] SincInterpolator[4, 14]:
+        """Returns a reference to the SincInterpolator struct for performing sinc interpolation.
+
+        Returns:
+            A reference to the SincInterpolator struct.
+        """
+        return self.environment_ptr.value()[].sinc_interpolator
+
+    def osc_buffers(self) -> ref[self.environment_ptr.value()[].osc_buffers] OscBuffers:
+        """Returns a reference to the OscBuffers struct for accessing oscillator buffers.
+
+        Returns:
+            A reference to the OscBuffers struct.
+        """
+        return self.environment_ptr.value()[].osc_buffers
+
+    def messenger_manager(self) -> ref[self.environment_ptr.value()[].messenger_manager] MessengerManager:
+        """Returns a reference to the MessengerManager struct for managing messages.
+
+        Returns:
+            A reference to the MessengerManager struct.
+        """
+        return self.environment_ptr.value()[].messenger_manager
+
     def __init__(out self, sample_rate: Float64,
-        environment_ptr: Optional[UnsafePointer[Environment, MutUntrackedOrigin]] = None,
+        environment_ptr: Optional[UnsafePointer[mut=True, Environment, MutUntrackedOrigin]] = None,
     ):
         """Initializes the MMMWorld struct.
 
@@ -77,8 +109,8 @@ struct MMMWorld(Movable, Copyable):
         Returns:
             The current mouse x position as a value between 0.0 and 1.0.
         """
-        if self.environment.value():
-            return self.environment.value()[].mouse_x
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].mouse_x
         
         print("Warning: Environment pointer is None. Returning default mouse_x value of 0.0.")
         return 0.0
@@ -89,8 +121,8 @@ struct MMMWorld(Movable, Copyable):
         Returns:
             The current mouse y position as a value between 0.0 and 1.0.
         """
-        if self.environment.value():
-            return self.environment.value()[].mouse_y
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].mouse_y
         
         print("Warning: Environment pointer is None. Returning default mouse_y value of 0.0.")
         return 0.0
@@ -101,8 +133,8 @@ struct MMMWorld(Movable, Copyable):
         Returns:
             True if the current sample is the first sample of the audio block, false otherwise.
         """
-        if self.environment.value():
-            return self.environment.value()[].top_of_block
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].top_of_block
 
         print("Warning: Environment pointer is None. Returning default top_of_block value of False.")
         return False
@@ -113,8 +145,8 @@ struct MMMWorld(Movable, Copyable):
         Returns:
             An integer that increments by 1 at the start of each audio block. Resets to 0 after reaching 2^31 - 1.
         """
-        if self.environment.value():
-            return self.environment.value()[].block_state
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].block_state
 
         print("Warning: Environment pointer is None. Returning default block_state value of 0.")
         return 0
@@ -125,8 +157,8 @@ struct MMMWorld(Movable, Copyable):
         Returns:
             The number of input channels.
         """
-        if self.environment.value():
-            return self.environment.value()[].num_in_chans
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].num_in_chans
 
         print("Warning: Environment pointer is None. Returning default num_in_chans value of 0.")
         return 0
@@ -138,8 +170,8 @@ struct MMMWorld(Movable, Copyable):
             The number of output channels.
         """
 
-        if self.environment.value():
-            return self.environment.value()[].num_out_chans
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].num_out_chans
 
         print("Warning: Environment pointer is None. Returning default num_out_chans value of 0.")
         return 0
@@ -154,8 +186,8 @@ struct MMMWorld(Movable, Copyable):
             The input sample value for the given channel.
         """
 
-        if self.environment.value():
-            return self.environment.value()[].sound_in[chan]
+        if self.environment_ptr:
+            return self.environment_ptr.value()[].sound_in[chan]
 
         print("Warning: Environment pointer is None. Returning default sound_in value of 0.0.")
         return 0.0
@@ -174,13 +206,31 @@ struct MMMWorld(Movable, Copyable):
             end: End string to print after all values. Must be specified using the keyword argument.
         """
         
-        if self.environment.value():
-            if self.environment.value()[].top_of_block:
-                if self.environment.value()[].print_counter % n_blocks == 0:
-                    comptime for i in range(values.__len__()):
-                        print(values[i], end=sep if i < values.__len__() - 1 else end)
+        if self.environment_ptr:
+            if self.environment_ptr.value()[].top_of_block and self.environment_ptr.value()[].print_counter % n_blocks == 0:
+                comptime for i in range(values.__len__()):
+                    print(values[i], end=sep if i < values.__len__() - 1 else end)
 
         print("Warning: Environment pointer is None. Cannot print values.")
+
+    def create_subworld(self, times_ov_samp: TimesOversampling = TimesOversampling.none) -> UnsafePointer[MMMWorld, MutUntrackedOrigin]:
+        """Create another MMMWorld instance using a different TimesOversampling.
+
+        This is mostly used to create an oversampled subworld with a higher sample rate based on the main world.
+
+        Args:
+            times_ov_samp: A [TimesOversampling](MMMWorld.md#struct-timesoversampling) struct to indicate times oversampling.
+
+        Returns:
+            A pointer to the newly created MMMWorld struct.
+        """
+        new_world = alloc[MMMWorld](1) 
+        new_world.init_pointee_move(MMMWorld(
+            sample_rate=self.sample_rate * Float64(times_ov_samp.times), 
+            environment_ptr = self.environment_ptr
+        ))
+
+        return new_world
 
 @fieldwise_init
 struct Interp(Equatable, ImplicitlyCopyable):
