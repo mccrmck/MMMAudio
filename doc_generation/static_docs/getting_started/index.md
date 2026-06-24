@@ -32,20 +32,18 @@ On linux:
 sudo apt update
 sudo apt install libportaudio2 portaudio19-dev
 sudo apt install libhidapi-hidraw0 libhidapi-dev
-sudo apt install pulseaudio
+sudo apt install pulseaudio python3-dev build-essential
 ```
 
 Linux users may encounter issues installing some packages, like pyaudio. This is probably because you need to build the package on your machine. You may need some or more of the following:
 ```
 sudo apt-get install python3-all-dev python3-venv
 ```
-Linux users may also have an issue with pyautogui. If this is the case, the best solution is to look for how to switch Ubunto to Xorg instead of Wayland. We will look for future solutions that do not use pyautogui.
-
-Finally, the authors successfuly gotten python venv to work with pip, but have not gotten 
+Linux users may also have an issue with pyautogui, which we use to track the mouse. If this is the case, the best solution is to look for how to switch Ubuntu to Xorg instead of Wayland (available on ubuntu 24 and before) or to simply use the fake_mouse window when examples are looking for the mouse. We will look for future solutions that do not use pyautogui.
 
 ## 2b.1. Option 1 - Setup with pixi (For Windows, go to [MMMAudio-WindowsSetup](MMMAudio-WindowsSetup.md))
 
-This is confirmed to work on Mac, but we have not yet gotten this working on Linux (use Option 2 below).
+This is confirmed to work on Mac. It should also work on Linux. If it does not, us the Python Virtual Environment method @2b.2.
 
 ### 1 Install pixi with homebrew or curl.
 
@@ -53,13 +51,26 @@ See [pixi's installation instructions](https://pixi.prefix.dev/latest/installati
 
 ### 2 In the MMMAudio directory, type:
 
+You can change the version of python inside the pixi.toml file if you need to. 
+
 ```shell
 pixi install
 ```
 
-Notice that we use python3.12 in pixi.toml. You might be able to switch to 3.13 or 3.14, but some users experience issues with rtmidi not installing correctly on 3.13+.
+## 2b.2. Option 2 - Setup the Python Virtual Environment (Mac and Linux)
 
-### 3 Edit the .vscode/settings.json file to have the following:
+`cd` into the root of the downloaded repository, set up your virtual environment, and install required libraries. this should work with python 3.12 and above.  If you find it does or doesn't work with other versions [let us know](https://github.com/spluta/MMMAudio/issues).
+
+### 1 depending on your system set up, you may need to explicitly specify the Python version here, eg: 'python3.12 -m venv venv'. I was only able to get this working with python3.12 on Linux.
+
+```shell
+python -m venv venv 
+source venv/bin/activate
+
+pip install numpy scipy librosa pyautogui torch supriya-midi python-osc matplotlib PySide6 mojo==1.0.0b2 hidapi pyaudio
+```
+
+## 3 Edit the .vscode/settings.json file to have the following:
 ```
 {
     "search.useIgnoreFiles": true, 
@@ -70,34 +81,15 @@ Notice that we use python3.12 in pixi.toml. You might be able to switch to 3.13 
 }
 ```
 
-### 4 In View -> Command Palette -> Python: Select Interpreter, choose `.pixi/envs/default/bin/python`. For me, this only appeared after I quit and restarted VSCode.
+## 4 In View -> Command Palette -> Python: Select Interpreter, choose `.pixi/envs/default/bin/python` or `venv/bin/python`. For me, this only appeared after I quit and restarted VSCode.
 
 You should be good to go.
 
-## 2b.2. Option 2 - Setup the Python Virtual Environment (On Windows, follow the instructions under 2w. first, then come back here to get Python correctly configured)
-
-`cd` into the root of the downloaded repository, set up your virtual environment, and install required libraries. this should work with python 3.12 and above.  If you find it does or doesn't work with other versions [let us know](https://github.com/spluta/MMMAudio/issues).
-
-### 1 depending on your system set up, you may need to explicitly specify the Python version here, eg: 'python3.12 -m venv venv'
-
-```shell
-python -m venv venv 
-source venv/bin/activate
-
-pip install numpy scipy librosa pyautogui torch supriya-midi python-osc python-rtmidi matplotlib PySide6 mojo==1.0.0b1 hidapi pyaudio
-```
-
-### 2 Install Python and Mojo VSCode Extensions
+## 5 Install Python and Mojo VSCode Extensions
 
 Click on the Extensions icon on the left hand side of VS Code and install the Python and Mojo extensions.
 
-### 3 In View -> Command Palette -> Python: Select Interpreter, choose `venv/bin/python`. 
-
-if you have trouble installing/running `pyaudio`, try this:
-1. [do this](https://stackoverflow.com/questions/68251169/unable-to-install-pyaudio-on-m1-mac-portaudio-already-installed/68296168#68296168)
-2. Then this uninstall and reinstall `pyaudio` (`hidapi` may be the same).
-
-### 4 VSCode issues - Microsoft giveth, Microsoft taketh away
+## 6 VSCode issues - Microsoft giveth, Microsoft taketh away
 
 VSCode is amazing, but most of the issues users encounter are caused by VSCode's Python inconsistancies. 
 #### a) See 2.3 above on proper vscode settings for Python. 
@@ -107,7 +99,7 @@ VSCode is amazing, but most of the issues users encounter are caused by VSCode's
 
 Go to [MMMAudio-WindowsSetup](MMMAudio-WindowsSetup.md)
 
-## 3. Run an Example
+## 7. Run an Example
 
 The best way to run MMMAudio is in REPL mode in your editor. 
 
