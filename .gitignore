@@ -28,6 +28,7 @@
 !README.md
 !requirements.txt
 !TODO.md
+!*.toml
 
 *.zip
 *.wav
