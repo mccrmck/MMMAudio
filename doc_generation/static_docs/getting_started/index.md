@@ -60,13 +60,14 @@ pixi install
 
 ## 2b.2. Option 2 - Setup using uv
 
+### 1 Install uv.
 
+See [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
+
+### 2 In the MMMAudio directory, type:
 
 ```
-# Create venv with the Python version specified in pyproject.toml
-uv venv
-
-# Or specify Python version explicitly
+# Install uv, specifying Python version explicitly
 uv venv --python 3.14
 
 # Sync/install all dependencies from pyproject.toml
@@ -113,6 +114,7 @@ Click on the Extensions icon on the left hand side of VS Code and install the Py
 VSCode is amazing, but most of the issues users encounter are caused by VSCode's Python inconsistancies. 
 #### a) See 2.3 above on proper vscode settings for Python. 
 #### b) We have found that setting Settings -> Auto Activation Type to `shellStartup` works better than the default `command` setting.
+#### c) This one will drive me to drink: Some versions of VSCode on SOME machines will send garbled Python code to the terminal if a code chunk is too long. I guess you just need to chunk your code up into smaller defs?
 
 ## 2w. Setup the Environment on Windows/WSL2 with Ubuntu
 
