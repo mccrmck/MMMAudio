@@ -445,7 +445,7 @@ def read_wav_SIMDs[num_channels: Int](file_name: String, header: WavHeader, num_
         file_data = f.read_bytes()
     
     if not is_pcm and not is_float:
-        raise Error("Unsupported audio format: " + String(audio_format) + ". Only PCM (1) and IEEE Float (3) are supported.")
+        raise Error("Unsupported audio format: " + String(audio_format) + ". Only PCM (1) and IEEE Float (3) are supported. Try converting the file to a supported format using an audio editor or converter.")
     
     # Read samples
     var offset = data_offset
