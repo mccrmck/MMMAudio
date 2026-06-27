@@ -1,14 +1,17 @@
 [workspace]
-authors = ["Sam Pluta <spluta@gmail.com>","Ted Moore <ted@tedmooremusic.com>"]
-channels = ["https://conda.modular.com/max-nightly", "conda-forge", "pytorch","https://repo.prefix.dev/modular-community"]
+authors = ["Sam Pluta <spluta@gmail.com>", "Ted Moore <ted@tedmooremusic.com>"]
+channels = [
+  "https://conda.modular.com/max-nightly",
+  "conda-forge",
+  "pytorch",
+  "https://repo.prefix.dev/modular-community"
+]
 name = "MMMAudio"
 platforms = ["osx-arm64", "linux-64", "linux-aarch64"]
 version = "0.1.0"
 
 [tasks.validate]
-args = [
-  { "arg" = "plots", "default" = "" }
-]
+args = [{ "arg" = "plots", "default" = "" }]
 cmd = "python testing_mmm_audio/validation/run_all_validations.py {{ plots }}"
 
 [tasks.validate_snapshot]
@@ -24,7 +27,12 @@ cmd = "python testing_mmm_audio/test_build_mojo_files.py"
 cmd = "python testing_mmm_audio/check_docstrings.py"
 
 [tasks.test_all]
-depends-on = ["unit_tests","test_building","validate_snapshot","check_docstrings"]
+depends-on = [
+  "unit_tests",
+  "test_building",
+  "validate_snapshot",
+  "check_docstrings"
+]
 
 [tasks.docs_serve]
 cmd = "mkdocs serve"
@@ -49,6 +57,7 @@ mkdocstrings-python = ">=2.0.2,<3"
 ipykernel = ">=7.1.0,<8"
 jupyterlab = ">=4.5.5,<5"
 pixi-kernel = ">=0.7.1,<0.8"
+nvim = ">=0.12.3,<0.13"
 # portaudio = ">=19.7.0,<20"
 # libhidapi = ">=0.15,<1"
 # pyaudio = "*"
